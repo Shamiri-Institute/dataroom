@@ -7,7 +7,6 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 
 import { TeamContextType, initialState, useTeam } from "@/context/team-context";
-import { PlanEnum } from "@/ee/stripe/constants";
 import Cookies from "js-cookie";
 import {
   BrushIcon,
@@ -35,24 +34,18 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-import ProAnnualBanner from "../billing/pro-annual-banner";
-import ProBanner from "../billing/pro-banner";
 import { Progress } from "../ui/progress";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
-  const [showProBanner, setShowProBanner] = useState<boolean | null>(null);
-  const [showProAnnualBanner, setShowProAnnualBanner] = useState<
+  const [, setShowProBanner] = useState<boolean | null>(null);
+  const [, setShowProAnnualBanner] = useState<
     boolean | null
   >(null);
   const { currentTeam, teams, setCurrentTeam, isLoading }: TeamContextType =
     useTeam() || initialState;
   const {
     plan: userPlan,
-    isAnnualPlan,
-    isPro,
-    isBusiness,
-    isDatarooms,
     isDataroomsPlus,
     isFree,
     isTrial,
@@ -209,21 +202,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu className="group-data-[collapsible=icon]:hidden">
           <SidebarMenuItem>
             <div>
-              {/*
-               * if user is free and showProBanner is true show pro banner
-               */}
-              {isFree && showProBanner ? (
-                <ProBanner setShowProBanner={setShowProBanner} />
-              ) : null}
-              {/*
-               * if user is pro and showProAnnualBanner is true show pro annual banner
-               */}
-              {isPro && !isAnnualPlan && showProAnnualBanner ? (
-                <ProAnnualBanner
-                  setShowProAnnualBanner={setShowProAnnualBanner}
-                />
-              ) : null}
-
               <div className="mb-2">
                 {linksLimit ? (
                   <UsageProgress
