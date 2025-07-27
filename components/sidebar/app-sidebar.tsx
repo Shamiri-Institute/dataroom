@@ -11,7 +11,6 @@ import { PlanEnum } from "@/ee/stripe/constants";
 import Cookies from "js-cookie";
 import {
   BrushIcon,
-  CircleUserRound,
   CogIcon,
   ContactIcon,
   FolderIcon,
@@ -97,7 +96,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         url: "/datarooms",
         icon: ServerIcon,
         current: router.pathname.includes("datarooms"),
-        disabled: !isBusiness && !isDatarooms && !isDataroomsPlus && !isTrial,
+        // disabled: !isBusiness && !isDatarooms && !isDataroomsPlus && !isTrial,
         trigger: "sidebar_datarooms",
         plan: PlanEnum.Business,
         highlightItem: ["datarooms"],

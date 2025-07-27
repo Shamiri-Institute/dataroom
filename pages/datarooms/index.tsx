@@ -41,10 +41,6 @@ export default function DataroomsPage() {
     isDataroomsPlus ||
     (isBusiness && numDatarooms < limitDatarooms);
 
-  useEffect(() => {
-    if (!isTrial && (isFree || isPro)) router.push("/documents");
-  }, [isTrial, isFree, isPro]);
-
   return (
     <AppLayout>
       <main className="p-4 sm:m-4 sm:px-4 sm:py-4">
@@ -58,62 +54,15 @@ export default function DataroomsPage() {
             </p>
           </div>
           <div className="flex items-center gap-x-1">
-            {isBusiness && !canCreateUnlimitedDatarooms ? (
-              <UpgradePlanModal
-                clickedPlan={PlanEnum.DataRooms}
-                trigger="datarooms"
+            <AddDataroomModal>
+              <Button
+                className="group flex flex-1 items-center justify-start gap-x-3 px-3 text-left"
+                title="Create New Document"
               >
-                <Button
-                  className="group flex flex-1 items-center justify-start gap-x-3 px-3 text-left"
-                  title="Upgrade to Add Data Room"
-                >
-                  <span>Upgrade to Add Data Room</span>
-                </Button>
-              </UpgradePlanModal>
-            ) : isTrial &&
-              datarooms &&
-              !isBusiness &&
-              !isDatarooms &&
-              !isDataroomsPlus ? (
-              <div className="flex items-center gap-x-4">
-                <div className="text-sm text-destructive">
-                  <span>Dataroom Trial: </span>
-                  <span className="font-medium">
-                    {daysLeft(new Date(datarooms[0].createdAt), 7)} days left
-                  </span>
-                </div>
-                <UpgradePlanModal
-                  clickedPlan={PlanEnum.DataRooms}
-                  trigger="datarooms"
-                >
-                  <Button
-                    className="group flex flex-1 items-center justify-start gap-x-3 px-3 text-left"
-                    title="Upgrade to Add Data Room"
-                  >
-                    <span>Upgrade to Add Data Room</span>
-                  </Button>
-                </UpgradePlanModal>
-              </div>
-            ) : isBusiness || isDatarooms || isDataroomsPlus ? (
-              <AddDataroomModal>
-                <Button
-                  className="group flex flex-1 items-center justify-start gap-x-3 px-3 text-left"
-                  title="Create New Document"
-                >
-                  <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  <span>Create New Dataroom</span>
-                </Button>
-              </AddDataroomModal>
-            ) : (
-              <DataroomTrialModal>
-                <Button
-                  className="group flex flex-1 items-center justify-start gap-x-3 px-3 text-left"
-                  title="Start Data Room Trial"
-                >
-                  <span>Start Data Room Trial</span>
-                </Button>
-              </DataroomTrialModal>
-            )}
+                <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span>Create New Dataroom</span>
+              </Button>
+            </AddDataroomModal>
           </div>
         </section>
 
