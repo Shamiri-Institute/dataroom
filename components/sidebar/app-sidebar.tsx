@@ -98,7 +98,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         current: router.pathname.includes("datarooms"),
         // disabled: !isBusiness && !isDatarooms && !isDataroomsPlus && !isTrial,
         trigger: "sidebar_datarooms",
-        plan: PlanEnum.Business,
+        //plan: PlanEnum.Business,
         highlightItem: ["datarooms"],
       },
       {
@@ -106,9 +106,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         url: "/visitors",
         icon: ContactIcon,
         current: router.pathname.includes("visitors"),
-        disabled: isFree && !isTrial,
+        //disabled: isFree && !isTrial,
         trigger: "sidebar_visitors",
-        plan: PlanEnum.Pro,
+        //plan: PlanEnum.Pro,
         highlightItem: ["visitors"],
       },
       {
