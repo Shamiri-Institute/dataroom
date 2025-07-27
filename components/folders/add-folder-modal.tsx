@@ -135,21 +135,6 @@ export function AddFolderModal({
     }
   };
 
-  // If the team is on a free plan, show the upgrade modal
-  if (isFree && !isTrial) {
-    if (children) {
-      return (
-        <UpgradePlanModal
-          clickedPlan={PlanEnum.Pro}
-          trigger={"add_folder_button"}
-          highlightItem={["folder", "multi-file"]}
-        >
-          {children}
-        </UpgradePlanModal>
-      );
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
