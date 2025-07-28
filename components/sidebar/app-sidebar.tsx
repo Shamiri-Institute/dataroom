@@ -45,8 +45,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { plan: userPlan, isDataroomsPlus, isFree, isTrial } = usePlan();
 
   const { limits } = useLimits();
-  const linksLimit = limits?.links;
-  const documentsLimit = limits?.documents;
+  const linksLimit = undefined;
+  const documentsLimit = undefined;
 
   useEffect(() => {
     if (Cookies.get("hideProBanner") !== "pro-banner") {
