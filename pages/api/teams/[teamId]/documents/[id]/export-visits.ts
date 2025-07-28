@@ -3,9 +3,9 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 
+import prisma from "@/lib/prisma";
 import { jobStore } from "@/lib/redis-job-store";
 import { exportVisitsTask } from "@/lib/trigger/export-visits";
-import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 
 export default async function handler(
@@ -86,18 +86,15 @@ export default async function handler(
       },
       {
         idempotencyKey: exportJob.id,
-        tags: [
-          `team_${teamId}`,
-          `user_${userId}`,
-          `export_${exportJob.id}`,
-        ],
+        tags: [`team_${teamId}`, `user_${userId}`, `export_${exportJob.id}`],
       },
     );
 
     return res.status(200).json({
       exportId: exportJob.id,
       status: exportJob.status,
-      message: "Export job created successfully. You will be notified when it's ready.",
+      message:
+        "Export job created successfully. You will be notified when it's ready.",
     });
   } catch (error) {
     console.error("Error creating export job:", error);

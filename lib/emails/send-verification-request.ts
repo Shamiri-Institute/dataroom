@@ -1,6 +1,6 @@
-import LoginLink from "@/components/emails/verification-link";
-
 import { sendEmail } from "@/lib/resend";
+
+import LoginLink from "@/components/emails/verification-link";
 
 import { generateChecksum } from "../utils/generate-checksum";
 

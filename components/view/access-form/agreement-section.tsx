@@ -2,9 +2,9 @@ import { Dispatch, SetStateAction } from "react";
 
 import { Brand, DataroomBrand } from "@prisma/client";
 
-import { Checkbox } from "@/components/ui/checkbox";
-
 import { determineTextColor } from "@/lib/utils/determine-text-color";
+
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { DEFAULT_ACCESS_FORM_TYPE } from ".";
 

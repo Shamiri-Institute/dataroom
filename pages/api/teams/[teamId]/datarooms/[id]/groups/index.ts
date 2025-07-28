@@ -1,13 +1,13 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import { ItemType } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
-import { ItemType } from "@prisma/client";
 
 export default async function handle(
   req: NextApiRequest,
@@ -60,20 +60,21 @@ export default async function handle(
               createdAt: "desc",
             },
             include: {
-              ...(documentId ? {
-                accessControls: {
-                  where: {
-                    itemId: documentId,
-                    itemType: ItemType.DATAROOM_DOCUMENT,
-                  },
-                  select: {
-                    id: true,
-                    canView: true,
-                    canDownload: true,
-                    itemId: true,
-                  },
-                },
-              }
+              ...(documentId
+                ? {
+                    accessControls: {
+                      where: {
+                        itemId: documentId,
+                        itemType: ItemType.DATAROOM_DOCUMENT,
+                      },
+                      select: {
+                        id: true,
+                        canView: true,
+                        canDownload: true,
+                        itemId: true,
+                      },
+                    },
+                  }
                 : {}),
               _count: {
                 select: {

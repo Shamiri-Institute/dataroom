@@ -5,12 +5,12 @@ import { useEffect } from "react";
 import { useTeam } from "@/context/team-context";
 import { toast } from "sonner";
 
+import { useAnalytics } from "@/lib/analytics";
+import { usePlan } from "@/lib/swr/use-billing";
+
 import UpgradePlanContainer from "@/components/billing/upgrade-plan-container";
 import AppLayout from "@/components/layouts/app";
 import { SettingsHeader } from "@/components/settings/settings-header";
-
-import { useAnalytics } from "@/lib/analytics";
-import { usePlan } from "@/lib/swr/use-billing";
 
 export default function Billing() {
   const router = useRouter();

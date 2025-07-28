@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useTeam } from "@/context/team-context";
 import { ArrowUpDownIcon, FolderPlusIcon, PlusIcon } from "lucide-react";
 
+import { useDataroom, useDataroomItems } from "@/lib/swr/use-dataroom";
+
 import DownloadDataroomButton from "@/components/datarooms/actions/download-dataroom";
 import GenerateIndexButton from "@/components/datarooms/actions/generate-index-button";
 import { DataroomHeader } from "@/components/datarooms/dataroom-header";
@@ -18,8 +20,6 @@ import { AddFolderModal } from "@/components/folders/add-folder-modal";
 import AppLayout from "@/components/layouts/app";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-
-import { useDataroom, useDataroomItems } from "@/lib/swr/use-dataroom";
 
 export default function Documents() {
   const router = useRouter();

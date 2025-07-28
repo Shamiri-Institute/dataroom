@@ -1,6 +1,6 @@
-import WelcomeEmail from "@/components/emails/welcome";
-
 import { sendEmail } from "@/lib/resend";
+
+import WelcomeEmail from "@/components/emails/welcome";
 
 import { CreateUserEmailProps } from "../types";
 

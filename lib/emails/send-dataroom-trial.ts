@@ -1,6 +1,6 @@
-import DataroomTrialWelcome from "@/components/emails/dataroom-trial-welcome";
-
 import { sendEmail } from "@/lib/resend";
+
+import DataroomTrialWelcome from "@/components/emails/dataroom-trial-welcome";
 
 export const sendDataroomTrialWelcome = async ({
   fullName,

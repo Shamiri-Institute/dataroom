@@ -84,8 +84,6 @@ export default function FolderCard({
     }
   }, [openFolder, addDataroomOpen]);
 
-
-
   const handleCreateDataroom = (e: any, folderId: string) => {
     e.stopPropagation();
     e.preventDefault();

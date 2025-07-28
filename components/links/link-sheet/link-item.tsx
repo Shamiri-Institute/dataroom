@@ -1,11 +1,7 @@
 import { CircleHelpIcon, RotateCcwIcon } from "lucide-react";
 
-
-
 import { usePlan } from "@/lib/swr/use-billing";
 import { cn } from "@/lib/utils";
-
-
 
 import PlanBadge from "@/components/billing/plan-badge";
 import { Button } from "@/components/ui/button";

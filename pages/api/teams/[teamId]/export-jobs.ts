@@ -3,9 +3,9 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 
-import { exportVisitsTask } from "@/lib/trigger/export-visits";
-import { jobStore } from "@/lib/redis-job-store";
 import prisma from "@/lib/prisma";
+import { jobStore } from "@/lib/redis-job-store";
+import { exportVisitsTask } from "@/lib/trigger/export-visits";
 import { CustomUser } from "@/lib/types";
 
 export default async function handler(
@@ -51,8 +51,8 @@ export default async function handler(
       }
 
       if (team.plan === "free") {
-        return res.status(403).json({ 
-          error: "This feature is not available for your plan" 
+        return res.status(403).json({
+          error: "This feature is not available for your plan",
         });
       }
 
@@ -78,11 +78,7 @@ export default async function handler(
         },
         {
           idempotencyKey: exportJob.id,
-          tags: [
-            `team_${teamId}`,
-            `user_${userId}`,
-            `export_${exportJob.id}`,
-          ],
+          tags: [`team_${teamId}`, `user_${userId}`, `export_${exportJob.id}`],
         },
       );
 

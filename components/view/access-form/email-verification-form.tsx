@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { useMediaQuery } from "@/lib/utils/use-media-query";
+
 import { Button } from "@/components/ui/button";
 import {
   InputOTP,
@@ -7,8 +9,6 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { DEFAULT_ACCESS_FORM_TYPE } from "@/components/view/access-form";
-
-import { useMediaQuery } from "@/lib/utils/use-media-query";
 
 const REGEXP_ONLY_DIGITS = "^\\d+$";
 

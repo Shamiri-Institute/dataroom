@@ -7,6 +7,9 @@ import { PlanEnum } from "@/ee/stripe/constants";
 import { toast } from "sonner";
 import { mutate } from "swr";
 
+import { usePlan } from "@/lib/swr/use-billing";
+import useDatarooms from "@/lib/swr/use-datarooms";
+
 import { UpgradePlanModal } from "@/components/billing/upgrade-plan-modal";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,9 +20,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-import { usePlan } from "@/lib/swr/use-billing";
-import useDatarooms from "@/lib/swr/use-datarooms";
 
 export default function DuplicateDataroom({
   dataroomId,

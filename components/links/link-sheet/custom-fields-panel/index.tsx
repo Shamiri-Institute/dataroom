@@ -1,7 +1,10 @@
+import { useCallback, useMemo } from "react";
+
 import { CustomField, CustomFieldType } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { useCallback, useMemo } from "react";
+
+import { usePlan } from "@/lib/swr/use-billing";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,8 +16,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-import { usePlan } from "@/lib/swr/use-billing";
 
 import CustomFieldComponent from "./custom-field";
 
@@ -67,42 +68,51 @@ export default function CustomFieldsPanel({
     onChange([...fields, newField]);
   }, [fields, fieldLimit, isDatarooms, onChange]);
 
-  const updateField = useCallback((index: number, updatedField: CustomFieldData) => {
-    const newFields = [...fields];
-    newFields[index] = updatedField;
-    onChange(newFields);
-  }, [fields, onChange]);
+  const updateField = useCallback(
+    (index: number, updatedField: CustomFieldData) => {
+      const newFields = [...fields];
+      newFields[index] = updatedField;
+      onChange(newFields);
+    },
+    [fields, onChange],
+  );
 
-  const removeField = useCallback((index: number) => {
-    const newFields = fields.filter((_, i) => i !== index);
-    // Update orderIndex for remaining fields
-    newFields.forEach((field, i) => {
-      field.orderIndex = i;
-    });
-    onChange(newFields);
-  }, [fields, onChange]);
+  const removeField = useCallback(
+    (index: number) => {
+      const newFields = fields.filter((_, i) => i !== index);
+      // Update orderIndex for remaining fields
+      newFields.forEach((field, i) => {
+        field.orderIndex = i;
+      });
+      onChange(newFields);
+    },
+    [fields, onChange],
+  );
 
-  const moveField = useCallback((index: number, direction: "up" | "down") => {
-    if (
-      (direction === "up" && index === 0) ||
-      (direction === "down" && index === fields.length - 1)
-    )
-      return;
+  const moveField = useCallback(
+    (index: number, direction: "up" | "down") => {
+      if (
+        (direction === "up" && index === 0) ||
+        (direction === "down" && index === fields.length - 1)
+      )
+        return;
 
-    const newFields = [...fields];
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    [newFields[index], newFields[newIndex]] = [
-      newFields[newIndex],
-      newFields[index],
-    ];
+      const newFields = [...fields];
+      const newIndex = direction === "up" ? index - 1 : index + 1;
+      [newFields[index], newFields[newIndex]] = [
+        newFields[newIndex],
+        newFields[index],
+      ];
 
-    // Update orderIndex for all fields
-    newFields.forEach((field, i) => {
-      field.orderIndex = i;
-    });
+      // Update orderIndex for all fields
+      newFields.forEach((field, i) => {
+        field.orderIndex = i;
+      });
 
-    onChange(newFields);
-  }, [fields, onChange]);
+      onChange(newFields);
+    },
+    [fields, onChange],
+  );
 
   return (
     <Sheet open={isConfigOpen} onOpenChange={setIsConfigOpen}>

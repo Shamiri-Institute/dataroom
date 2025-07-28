@@ -14,6 +14,8 @@ import {
 import { motion } from "motion/react";
 import { mutate } from "swr";
 
+import { cn } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,8 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/ui/status-badge";
-
-import { cn } from "@/lib/utils";
 
 import { useDeleteDomainModal } from "./delete-domain-modal";
 import DomainConfiguration from "./domain-configuration";

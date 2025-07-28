@@ -39,17 +39,10 @@ import { Progress } from "../ui/progress";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
   const [, setShowProBanner] = useState<boolean | null>(null);
-  const [, setShowProAnnualBanner] = useState<
-    boolean | null
-  >(null);
+  const [, setShowProAnnualBanner] = useState<boolean | null>(null);
   const { currentTeam, teams, setCurrentTeam, isLoading }: TeamContextType =
     useTeam() || initialState;
-  const {
-    plan: userPlan,
-    isDataroomsPlus,
-    isFree,
-    isTrial,
-  } = usePlan();
+  const { plan: userPlan, isDataroomsPlus, isFree, isTrial } = usePlan();
 
   const { limits } = useLimits();
   const linksLimit = limits?.links;

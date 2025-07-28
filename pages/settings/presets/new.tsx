@@ -1,7 +1,5 @@
 import { useRouter } from "next/router";
 
-
-
 import { FormEvent, useState } from "react";
 
 import { useTeam } from "@/context/team-context";
@@ -57,13 +55,8 @@ export default function NewPreset() {
     name: "",
   });
 
-  const {
-    isPro,
-    isBusiness,
-    isDatarooms,
-    isDataroomsPlus,
-    isTrial,
-  } = usePlan();
+  const { isPro, isBusiness, isDatarooms, isDataroomsPlus, isTrial } =
+    usePlan();
   const { limits } = useLimits();
   const allowAdvancedLinkControls = limits
     ? limits?.advancedLinkControlsOnPro

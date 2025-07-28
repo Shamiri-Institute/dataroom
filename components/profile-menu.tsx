@@ -7,6 +7,8 @@ import { HelpCircle, LogOut, Search } from "lucide-react";
 import { FileText } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
+import { cn } from "@/lib/utils";
+
 import ChevronUp from "@/components/shared/icons/chevron-up";
 import {
   Command,
@@ -25,8 +27,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-
-import { cn } from "@/lib/utils";
 
 import { SearchCommand } from "./search-command";
 import UserRound from "./shared/icons/user-round";

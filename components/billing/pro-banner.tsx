@@ -41,10 +41,7 @@ export default function ProBanner({
         Upgrade to unlock custom branding, team members, domains and data rooms.
       </p>
       <div className="flex">
-        <UpgradePlanModal
-          clickedPlan={PlanEnum.Pro}
-          trigger={"pro_banner"}
-        >
+        <UpgradePlanModal clickedPlan={PlanEnum.Pro} trigger={"pro_banner"}>
           <Button
             type="button"
             className="grow"

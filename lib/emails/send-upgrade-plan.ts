@@ -1,7 +1,7 @@
-import UpgradePlanEmail from "@/components/emails/upgrade-plan";
-
 import { sendEmail } from "@/lib/resend";
 import { CreateUserEmailProps } from "@/lib/types";
+
+import UpgradePlanEmail from "@/components/emails/upgrade-plan";
 
 export const sendUpgradePlanEmail = async (
   params: CreateUserEmailProps & { planType: string },

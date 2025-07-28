@@ -6,6 +6,11 @@ import { useEffect } from "react";
 import { PlanEnum } from "@/ee/stripe/constants";
 import { PlusIcon } from "lucide-react";
 
+import { usePlan } from "@/lib/swr/use-billing";
+import useDatarooms from "@/lib/swr/use-datarooms";
+import useLimits from "@/lib/swr/use-limits";
+import { daysLeft } from "@/lib/utils";
+
 import { UpgradePlanModal } from "@/components/billing/upgrade-plan-modal";
 import { AddDataroomModal } from "@/components/datarooms/add-dataroom-modal";
 import { DataroomTrialModal } from "@/components/datarooms/dataroom-trial-modal";
@@ -21,12 +26,8 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-import { usePlan } from "@/lib/swr/use-billing";
-import useDatarooms from "@/lib/swr/use-datarooms";
-import useLimits from "@/lib/swr/use-limits";
-import { daysLeft } from "@/lib/utils";
-
 export default function DataroomsPage() {
+  console.log("here");
   const { datarooms } = useDatarooms();
   const { isFree, isPro, isBusiness, isDatarooms, isDataroomsPlus, isTrial } =
     usePlan();

@@ -1,6 +1,6 @@
-import EmailVerification from "@/components/emails/email-verification";
-
 import { sendEmail } from "@/lib/resend";
+
+import EmailVerification from "@/components/emails/email-verification";
 
 export const sendVerificationEmail = async (
   email: string,

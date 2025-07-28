@@ -25,6 +25,10 @@ import {
 import { toast } from "sonner";
 import useSWR from "swr";
 
+import { usePlan } from "@/lib/swr/use-billing";
+import { fetcher, timeAgo } from "@/lib/utils";
+import { downloadCSV } from "@/lib/utils/csv";
+
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -36,11 +40,7 @@ import {
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/visitors/data-table-pagination";
 
-import { usePlan } from "@/lib/swr/use-billing";
-import { fetcher, timeAgo } from "@/lib/utils";
-import { downloadCSV } from "@/lib/utils/csv";
 import { UpgradeButton } from "../ui/upgrade-button";
-
 
 interface Document {
   id: string;

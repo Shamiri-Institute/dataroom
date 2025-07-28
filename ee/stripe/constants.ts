@@ -85,10 +85,11 @@ export const BASE_FEATURES: Record<PlanEnum, PlanFeatures> = {
         isUsers: true,
         usersIncluded: 3,
       },
-      { 
-        id: "datarooms", 
+      {
+        id: "datarooms",
         text: "Unlimited light data rooms",
-        tooltip: "Light data rooms include only basic security settings for sharing your data room, described in Business plan. "
+        tooltip:
+          "Light data rooms include only basic security settings for sharing your data room, described in Business plan. ",
       },
       { id: "documents", text: "1000 documents per data room" },
       {

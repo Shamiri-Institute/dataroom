@@ -1,8 +1,8 @@
 import ErrorPage from "next/error";
 
-import { Skeleton } from "@/components/ui/skeleton";
-
 import { TStatsData } from "@/lib/swr/use-stats";
+
+import { Skeleton } from "@/components/ui/skeleton";
 
 import StatsElement from "./stats-element";
 

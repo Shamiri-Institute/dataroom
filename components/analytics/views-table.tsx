@@ -48,6 +48,7 @@ import {
 import { BadgeTooltip } from "@/components/ui/tooltip";
 import { DataTablePagination } from "@/components/visitors/data-table-pagination";
 import { VisitorAvatar } from "@/components/visitors/visitor-avatar";
+
 import { UpgradeButton } from "../ui/upgrade-button";
 
 interface View {

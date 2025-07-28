@@ -10,12 +10,12 @@ import {
 } from "recharts";
 import useSWR from "swr";
 
+import { fetcher } from "@/lib/utils";
+
 import StatsElement from "@/components/documents/stats-element";
 import VideoChartPlaceholder from "@/components/documents/video-chart-placeholder";
 import { Card, CardContent } from "@/components/ui/card";
 import LoadingSpinner from "@/components/ui/loading-spinner";
-
-import { fetcher } from "@/lib/utils";
 
 interface VideoAnalyticsProps {
   teamId: string;

@@ -2,10 +2,10 @@ import { Dispatch, SetStateAction, useState } from "react";
 
 import { Brand, DataroomBrand } from "@prisma/client";
 
+import { determineTextColor } from "@/lib/utils/determine-text-color";
+
 import Eye from "@/components/shared/icons/eye";
 import EyeOff from "@/components/shared/icons/eye-off";
-
-import { determineTextColor } from "@/lib/utils/determine-text-color";
 
 import { DEFAULT_ACCESS_FORM_TYPE } from ".";
 

@@ -1,6 +1,6 @@
-import Onboarding5Email from "@/components/emails/onboarding-5";
-
 import { sendEmail } from "@/lib/resend";
+
+import Onboarding5Email from "@/components/emails/onboarding-5";
 
 import { CreateUserEmailProps } from "../types";
 

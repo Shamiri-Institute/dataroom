@@ -1,10 +1,10 @@
 import { Brand, CustomField, DataroomBrand } from "@prisma/client";
 
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-
 import { cn } from "@/lib/utils";
 import { determineTextColor } from "@/lib/utils/determine-text-color";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function CustomFieldsSection({
   fields,

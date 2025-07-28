@@ -1,9 +1,9 @@
 import ErrorPage from "next/error";
 
+import { useDataroomStats } from "@/lib/swr/use-dataroom-stats";
+
 import StatsElement from "@/components/documents/stats-element";
 import { Skeleton } from "@/components/ui/skeleton";
-
-import { useDataroomStats } from "@/lib/swr/use-dataroom-stats";
 
 export default function StatsCard() {
   const { stats, loading, error } = useDataroomStats();

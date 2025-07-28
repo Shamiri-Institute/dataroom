@@ -2,9 +2,9 @@ import { useRouter } from "next/router";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-
 import { determineTextColor } from "@/lib/utils/determine-text-color";
+
+import { Button } from "@/components/ui/button";
 
 export default function ViewPage() {
   const router = useRouter();

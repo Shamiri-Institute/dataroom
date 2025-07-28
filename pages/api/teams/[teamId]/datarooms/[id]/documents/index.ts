@@ -160,7 +160,9 @@ export default async function handle(
                 orderBy: { createdAt: "desc" },
                 take: 1,
               },
-              _count: { select: { viewerGroups: true, permissionGroups: true } },
+              _count: {
+                select: { viewerGroups: true, permissionGroups: true },
+              },
             },
           },
         },

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { TruncatedBreadcrumbLink } from "../layouts/breadcrumb";
+
 function BreadcrumbComponentBase({
   name,
   dataroomId,

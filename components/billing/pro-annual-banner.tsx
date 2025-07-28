@@ -8,10 +8,10 @@ import Cookies from "js-cookie";
 import { usePlausible } from "next-plausible";
 import { toast } from "sonner";
 
+import { usePlan } from "@/lib/swr/use-billing";
+
 import X from "@/components/shared/icons/x";
 import { Button } from "@/components/ui/button";
-
-import { usePlan } from "@/lib/swr/use-billing";
 
 export default function ProAnnualBanner({
   setShowProAnnualBanner,

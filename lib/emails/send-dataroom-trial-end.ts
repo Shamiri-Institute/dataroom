@@ -1,6 +1,6 @@
-import DataroomTrialEnd from "@/components/emails/dataroom-trial-end";
-
 import { sendEmail } from "@/lib/resend";
+
+import DataroomTrialEnd from "@/components/emails/dataroom-trial-end";
 
 export const sendDataroomTrialEndEmail = async (params: {
   email: string;
