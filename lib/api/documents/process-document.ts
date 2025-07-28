@@ -85,8 +85,8 @@ export const processDocument = async ({
       contentType: contentType,
       type: type,
       storageType,
-      ownerId: userId,
-      teamId: teamId,
+      owner: userId ? { connect: { id: userId } } : undefined,
+      team: { connect: { id: teamId } },
       advancedExcelEnabled: enableExcelAdvancedMode,
       downloadOnly: isDownloadOnly,
       ...(createLink && {
@@ -109,7 +109,7 @@ export const processDocument = async ({
           fileSize: fileSize,
         },
       },
-      folderId: folder?.id ?? null,
+      folder: folder?.id ? { connect: { id: folder.id } } : undefined,
       isExternalUpload,
     },
     include: {
