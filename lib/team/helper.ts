@@ -129,10 +129,10 @@ export async function getTeamWithDomain({
   }
 
   // check if the team has a paid plan
-  const teamHasPaidPlan = team?.plan !== "free";
-  if (!teamHasPaidPlan) {
-    throw new TeamError("Team doesn't have a paid plan");
-  }
+  // const teamHasPaidPlan = team?.plan !== "free";
+  // if (!teamHasPaidPlan) {
+  //   throw new TeamError("Team doesn't have a paid plan");
+  // }
 
   // check if the domain exists in the team
   let domain: Domain | undefined;
