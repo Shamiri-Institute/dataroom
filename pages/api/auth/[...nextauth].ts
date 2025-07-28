@@ -105,7 +105,15 @@ export const authOptions: NextAuthOptions = {
         });
         return false;
       }
-      return true;
+
+      if (
+        user.email?.endsWith("@shamiri.institute") ||
+        user.email?.endsWith("@shamirihealth.com")
+      ) {
+        return true;
+      }
+
+      return false;
     },
 
     jwt: async (params) => {
