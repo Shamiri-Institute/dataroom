@@ -27,8 +27,9 @@ export default function App({
   return (
     <>
       <Head>
-        <title>Papermark | The Open Source DocSend Alternative</title>
+        <title>Shamiri Dataroom</title>
         <meta name="theme-color" content="#000000" />
+        {/*
         <meta
           name="description"
           content="Papermark is an open-source document sharing alternative to DocSend with built-in analytics."
@@ -69,6 +70,7 @@ export default function App({
           content="https://www.papermark.com/_static/meta-image.png"
           key="tw-image"
         />
+        */}
         <link rel="icon" href="/favicon.ico" key="favicon" />
       </Head>
       <SessionProvider session={session}>
