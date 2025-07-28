@@ -21,7 +21,7 @@ import {
 } from "@/lib/types";
 
 import LoadingSpinner from "@/components/ui/loading-spinner";
-import CustomMetaTag from "@/components/view/custom-metatag";
+//import CustomMetaTag from "@/components/view/custom-metatag";
 import DataroomView from "@/components/view/dataroom/dataroom-view";
 import DocumentView from "@/components/view/document-view";
 
@@ -310,6 +310,7 @@ export default function ViewPage({
     if (!linkData || status === "loading" || router.isFallback) {
       return (
         <>
+          {/*
           <CustomMetaTag
             favicon={meta.metaFavicon}
             enableBranding={meta.enableCustomMetatag ?? false}
@@ -321,7 +322,7 @@ export default function ViewPage({
             description={meta.metaDescription ?? null}
             imageUrl={meta.metaImage ?? null}
             url={meta.metaUrl ?? ""}
-          />
+          /> */}
           <div className="flex h-screen items-center justify-center">
             <LoadingSpinner className="h-20 w-20" />
           </div>
@@ -356,6 +357,7 @@ export default function ViewPage({
 
     return (
       <>
+        {/*
         <CustomMetaTag
           favicon={meta.metaFavicon}
           enableBranding={meta.enableCustomMetatag ?? false}
@@ -368,6 +370,7 @@ export default function ViewPage({
           imageUrl={meta.metaImage ?? null}
           url={meta.metaUrl ?? ""}
         />
+        */}
         <DocumentView
           link={link}
           userEmail={verifiedEmail ?? storedEmail ?? userEmail}
@@ -394,7 +397,7 @@ export default function ViewPage({
     if (!link || status === "loading" || router.isFallback) {
       return (
         <>
-          <CustomMetaTag
+          {/*<CustomMetaTag
             favicon={meta.metaFavicon}
             enableBranding={meta.enableCustomMetatag ?? false}
             title={
@@ -405,7 +408,7 @@ export default function ViewPage({
             description={meta.metaDescription ?? null}
             imageUrl={meta.metaImage ?? null}
             url={meta.metaUrl ?? ""}
-          />
+          /> */}
           <div className="flex h-screen items-center justify-center">
             <LoadingSpinner className="h-20 w-20" />
           </div>
@@ -440,7 +443,7 @@ export default function ViewPage({
 
     return (
       <>
-        <CustomMetaTag
+        {/*<CustomMetaTag
           favicon={meta.metaFavicon}
           enableBranding={meta.enableCustomMetatag ?? false}
           title={
@@ -451,7 +454,7 @@ export default function ViewPage({
           description={meta.metaDescription ?? null}
           imageUrl={meta.metaImage ?? null}
           url={meta.metaUrl ?? ""}
-        />
+        /> */}
         <DataroomView
           link={link}
           userEmail={verifiedEmail ?? storedEmail ?? userEmail}
