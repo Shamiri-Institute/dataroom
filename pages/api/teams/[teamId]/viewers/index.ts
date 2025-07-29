@@ -55,9 +55,9 @@ export default async function handle(
         select: { id: true, plan: true },
       });
 
-      if (!team || team.plan === "free") {
-        return res.status(404).json({ error: "Team not found" });
-      }
+      // if (!team || team.plan === "free") {
+      //   return res.status(404).json({ error: "Team not found" });
+      // }
 
       const searchCondition = query
         ? Prisma.sql`AND LOWER(v.email) LIKE LOWER(${`${query}%`})`
