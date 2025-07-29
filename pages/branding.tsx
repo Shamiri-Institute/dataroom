@@ -411,6 +411,7 @@ export default function Branding() {
                     </div>
                   </CardContent>
                   <CardFooter className="border-t p-6">
+                    {/*
                     {plan === "free" && !isTrial ? (
                       <UpgradeButton
                         text="Save Branding"
@@ -423,6 +424,10 @@ export default function Branding() {
                         Save changes
                       </Button>
                     )}
+                    */}
+                    <Button onClick={saveBranding} loading={isLoading}>
+                      Save changes
+                    </Button>
                     {/* delete button */}
                     <Button
                       variant="link"
