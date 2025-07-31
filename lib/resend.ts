@@ -58,9 +58,9 @@ export const sendEmail = async ({
   try {
     const { data, error } = await resend.emails.send({
       from: fromAddress,
-      to: test ? "delivered@resend.dev" : to,
-      cc: cc,
-      replyTo: marketing ? "support@shamirihealth.com" : replyTo,
+      to,
+      cc,
+      replyTo: "osborn@shamiri.institute",
       subject,
       react,
       scheduledAt,
