@@ -46,14 +46,14 @@ export const sendEmail = async ({
   const fromAddress =
     from ??
     (marketing
-      ? "Shadrack from Shamiri <shadrack@shamiriehealth.com>"
+      ? "Tom from Shamiri <dataroom@shamiri.institute>"
       : system
-        ? "Shamiri <system@shamirihealth.com>"
+        ? "Shamiri <dataroom@shamiri.institute>"
         : verify
-          ? "Shamiri <system@shamirihealth.com>"
+          ? "Shamiri <dataroom@shamiri.institute>"
           : !!scheduledAt
-            ? "Shadrack Lilan <shadrack@shamirihealth.com>"
-            : "Shadrack from Shamiri <shadrack@shamirihealth.com>");
+            ? "Tom Osborn <dataroom@shamiri.institute>"
+            : "Tom from Shamiri <dataroom@shamiri.institute>");
 
   try {
     const { data, error } = await resend.emails.send({

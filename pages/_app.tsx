@@ -77,7 +77,7 @@ export default function App({
         <PostHogCustomProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
             <PlausibleProvider
-              domain="papermark.io"
+              domain="shamiri.institute"
               enabled={process.env.NEXT_PUBLIC_VERCEL_ENV === "production"}
             >
               <NuqsAdapter>
