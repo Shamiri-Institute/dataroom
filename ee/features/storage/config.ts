@@ -14,7 +14,7 @@ export interface StorageConfig {
   lambdaFunctionName?: string;
 }
 
-export type StorageRegion = "eu-central-1" | "us-east-2";
+export type StorageRegion = "eu-central-1" | "us-east-2" | "af-south-1";
 
 /**
  * Gets AWS storage configuration based on the storage region.
@@ -25,11 +25,10 @@ export type StorageRegion = "eu-central-1" | "us-east-2";
  */
 export function getStorageConfig(storageRegion?: string): StorageConfig {
   const isUS = storageRegion === "us-east-2";
-  const suffix = isUS ? "_US" : "";
 
   // Get base environment variables with optional suffix
   const getBucket = () => {
-    const bucketVar = `NEXT_PRIVATE_UPLOAD_BUCKET${suffix}`;
+    const bucketVar = `NEXT_PRIVATE_UPLOAD_BUCKET`;
     const bucket = process.env[bucketVar];
     if (!bucket) {
       throw new Error(`Missing environment variable: ${bucketVar}`);
@@ -38,7 +37,7 @@ export function getStorageConfig(storageRegion?: string): StorageConfig {
   };
 
   const getAccessKeyId = () => {
-    const keyVar = `NEXT_PRIVATE_UPLOAD_ACCESS_KEY_ID${suffix}`;
+    const keyVar = `NEXT_PRIVATE_UPLOAD_ACCESS_KEY_ID`;
     const key = process.env[keyVar];
     if (!key) {
       throw new Error(`Missing environment variable: ${keyVar}`);
@@ -47,7 +46,7 @@ export function getStorageConfig(storageRegion?: string): StorageConfig {
   };
 
   const getSecretAccessKey = () => {
-    const secretVar = `NEXT_PRIVATE_UPLOAD_SECRET_ACCESS_KEY${suffix}`;
+    const secretVar = `NEXT_PRIVATE_UPLOAD_SECRET_ACCESS_KEY`;
     const secret = process.env[secretVar];
     if (!secret) {
       throw new Error(`Missing environment variable: ${secretVar}`);
@@ -56,27 +55,24 @@ export function getStorageConfig(storageRegion?: string): StorageConfig {
   };
 
   const getRegion = () => {
-    const regionVar = `NEXT_PRIVATE_UPLOAD_REGION${suffix}`;
+    const regionVar = `NEXT_PRIVATE_UPLOAD_REGION`;
     return process.env[regionVar] || (isUS ? "us-east-2" : "eu-central-1");
   };
 
   return {
     bucket: getBucket(),
-    advancedBucket: process.env[`NEXT_PRIVATE_ADVANCED_UPLOAD_BUCKET${suffix}`],
+    advancedBucket: process.env[`NEXT_PRIVATE_ADVANCED_UPLOAD_BUCKET`],
     region: getRegion(),
     accessKeyId: getAccessKeyId(),
     secretAccessKey: getSecretAccessKey(),
-    endpoint: process.env[`NEXT_PRIVATE_UPLOAD_ENDPOINT${suffix}`],
-    distributionHost:
-      process.env[`NEXT_PRIVATE_UPLOAD_DISTRIBUTION_HOST${suffix}`],
+    endpoint: process.env[`NEXT_PRIVATE_UPLOAD_ENDPOINT`],
+    distributionHost: process.env[`NEXT_PRIVATE_UPLOAD_DISTRIBUTION_HOST`],
     advancedDistributionHost:
-      process.env[`NEXT_PRIVATE_ADVANCED_UPLOAD_DISTRIBUTION_HOST${suffix}`],
-    distributionKeyId:
-      process.env[`NEXT_PRIVATE_UPLOAD_DISTRIBUTION_KEY_ID${suffix}`],
+      process.env[`NEXT_PRIVATE_ADVANCED_UPLOAD_DISTRIBUTION_HOST`],
+    distributionKeyId: process.env[`NEXT_PRIVATE_UPLOAD_DISTRIBUTION_KEY_ID`],
     distributionKeyContents:
-      process.env[`NEXT_PRIVATE_UPLOAD_DISTRIBUTION_KEY_CONTENTS${suffix}`],
-    lambdaFunctionName:
-      process.env[`NEXT_PRIVATE_LAMBDA_FUNCTION_NAME${suffix}`],
+      process.env[`NEXT_PRIVATE_UPLOAD_DISTRIBUTION_KEY_CONTENTS`],
+    lambdaFunctionName: process.env[`NEXT_PRIVATE_LAMBDA_FUNCTION_NAME`],
   };
 }
 
