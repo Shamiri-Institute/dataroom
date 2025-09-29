@@ -27,6 +27,8 @@ export default async function handle(
     versionNumber: string;
   };
 
+  console.log("value for pageNumber: ", pageNumber);
+
   try {
     const imageUrl = await getFileForDocumentPage(
       Number(pageNumber),
@@ -36,6 +38,7 @@ export default async function handle(
 
     return res.status(200).json({ imageUrl });
   } catch (error) {
+    console.log("some serios error happened here");
     res.status(500).json({ message: (error as Error).message });
     return;
   }

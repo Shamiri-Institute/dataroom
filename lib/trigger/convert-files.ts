@@ -29,6 +29,9 @@ export const convertFilesToPdfTask = task({
       },
     });
 
+    console.log("we found the team");
+    console.log({ team });
+
     if (!team) {
       logger.error("Team not found", { teamId: payload.teamId });
       return;
@@ -54,6 +57,9 @@ export const convertFilesToPdfTask = task({
       },
     });
 
+    console.log("we have found the documents: ");
+    console.log({ document });
+
     if (
       !document ||
       !document.versions[0] ||
@@ -77,6 +83,11 @@ export const convertFilesToPdfTask = task({
       type: document.versions[0].storageType,
     });
 
+    console.log("loading the process.env variables: ");
+    console.log(process.env);
+    console.log("fetching the fileUrl using the fileUrl function");
+    console.log({ fileUrl });
+
     // Prepare form data
     const formData = new FormData();
     formData.append(
@@ -90,6 +101,7 @@ export const convertFilesToPdfTask = task({
     formData.append("quality", "75");
 
     updateStatus({ progress: 20, text: "Converting document..." });
+    console.log("in the document conversion stage");
 
     // Make the conversion request
     const conversionResponse = await retry.fetch(

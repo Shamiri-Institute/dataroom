@@ -23,8 +23,11 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(" ")[1]; // Assuming the format is "Bearer [token]"
 
+  console.log(process.env.INTERNAL_API_KEY);
+
   // Check if the API Key matches
   if (token !== process.env.INTERNAL_API_KEY) {
+    console.log("hello, the internal api key failed at this point");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -192,4 +195,4 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     });
     throw error;
   }
-};
+}

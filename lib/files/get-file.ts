@@ -52,10 +52,12 @@ const fetchPresignedUrl = async (
         errorMessage =
           textError || `Request failed with status ${response.status}`;
       }
+      console.log("pottential error from res.json: ", errorMessage);
     } else {
       const textError = await response.text();
       errorMessage =
         textError || `Request failed with status ${response.status}`;
+      console.log("potential error from res.text: ", errorMessage);
     }
 
     throw new Error(errorMessage);
