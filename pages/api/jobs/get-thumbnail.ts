@@ -38,7 +38,8 @@ export default async function handle(
 
     return res.status(200).json({ imageUrl });
   } catch (error) {
-    console.log("some serios error happened here");
+    console.log("some serious error happened here");
+    console.log(error)
     res.status(500).json({ message: (error as Error).message });
     return;
   }
