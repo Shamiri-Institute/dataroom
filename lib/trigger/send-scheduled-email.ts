@@ -1,4 +1,4 @@
-import { logger, task } from "@trigger.dev/sdk/v3";
+import { logger, task } from "@trigger.dev/sdk";
 
 import { sendDataroomInfoEmail } from "@/lib/emails/send-dataroom-info";
 import prisma from "@/lib/prisma";

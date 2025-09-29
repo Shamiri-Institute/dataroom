@@ -10,7 +10,6 @@ import { convertFilesToPdfTask } from "@/lib/trigger/convert-files";
 import { convertPdfToImageRoute } from "@/lib/trigger/pdf-to-image-route";
 import { CustomUser } from "@/lib/types";
 import { getExtension, log } from "@/lib/utils";
-import { conversionQueue } from "@/lib/utils/trigger-utils";
 
 import { authOptions } from "../../../auth/[...nextauth]";
 
@@ -129,7 +128,6 @@ export default async function handle(
               `document_${document.id}`,
               `version:${document.versions[0].id}`,
             ],
-            queue: conversionQueue(team.plan),
             concurrencyKey: teamId,
           },
         );
@@ -150,7 +148,6 @@ export default async function handle(
               `document_${document.id}`,
               `version:${document.versions[0].id}`,
             ],
-            queue: conversionQueue(team.plan),
             concurrencyKey: teamId,
           },
         );
