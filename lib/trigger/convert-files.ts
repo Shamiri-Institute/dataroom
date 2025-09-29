@@ -1,4 +1,4 @@
-import { logger, retry, task, queue } from "@trigger.dev/sdk";
+import { logger, queue, retry, task } from "@trigger.dev/sdk";
 
 import { getFile } from "@/lib/files/get-file";
 import { putFileServer } from "@/lib/files/put-file-server";
@@ -64,10 +64,6 @@ export const convertFilesToPdfTask = task({
       },
     });
 
-    logger.log("we found the team")
-
-    logger.log(JSON.stringify(team));
-
     if (!team) {
       logger.error("Team not found", { teamId: payload.teamId });
       return;
@@ -93,9 +89,6 @@ export const convertFilesToPdfTask = task({
       },
     });
 
-    logger.log("we have found the documents: ");
-    logger.log(JSON.stringify(document));
-
     if (
       !document ||
       !document.versions[0] ||
@@ -119,11 +112,6 @@ export const convertFilesToPdfTask = task({
       type: document.versions[0].storageType,
     });
 
-    logger.log("loading the process.env variables: ");
-    logger.log(JSON.stringify(process.env));
-    logger.log("fetching the fileUrl using the fileUrl function");
-    logger.log(fileUrl);
-
     // Prepare form data
     const formData = new FormData();
     formData.append(
@@ -137,7 +125,6 @@ export const convertFilesToPdfTask = task({
     formData.append("quality", "75");
 
     updateStatus({ progress: 20, text: "Converting document..." });
-    logger.log("in the document conversion stage");
 
     // Make the conversion request
     const conversionResponse = await retry.fetch(
@@ -175,8 +162,6 @@ export const convertFilesToPdfTask = task({
       await conversionResponse.arrayBuffer(),
     );
 
-    console.log("conversionBuffer", conversionBuffer);
-
     // get docId from url with starts with "doc_" with regex
     const match = document.versions[0].originalFile.match(/(doc_[^\/]+)\//);
     const docId = match ? match[1] : undefined;
@@ -205,9 +190,6 @@ export const convertFilesToPdfTask = task({
       });
       return;
     }
-
-    console.log("data from conversion", data);
-    console.log("storageType from conversion", storageType);
 
     const { versionNumber } = await prisma.documentVersion.update({
       where: { id: payload.documentVersionId },
@@ -394,9 +376,6 @@ export const convertCadToPdfTask = task({
       });
       return;
     }
-
-    console.log("data from conversion", data);
-    console.log("storageType from conversion", storageType);
 
     await prisma.documentVersion.update({
       where: { id: payload.documentVersionId },

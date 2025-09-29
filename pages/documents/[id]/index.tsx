@@ -28,7 +28,6 @@ export default function DocumentPage() {
     error,
     mutate: mutateDocument,
   } = useDocument();
-  console.log({ prismaDocument })
   const { links } = useDocumentLinks();
   const teamInfo = useTeam();
   const { isTrial } = usePlan();
