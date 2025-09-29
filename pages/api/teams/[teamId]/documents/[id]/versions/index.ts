@@ -12,7 +12,6 @@ import { processVideo } from "@/lib/trigger/optimize-video-files";
 import { convertPdfToImageRoute } from "@/lib/trigger/pdf-to-image-route";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
-import { conversionQueue } from "@/lib/utils/trigger-utils";
 
 export default async function handle(
   req: NextApiRequest,
@@ -116,7 +115,6 @@ export default async function handle(
               `document_${documentId}`,
               `version:${version.id}`,
             ],
-            queue: conversionQueue(team.plan),
             concurrencyKey: teamId,
           },
         );
@@ -138,7 +136,6 @@ export default async function handle(
               `document_${documentId}`,
               `version:${version.id}`,
             ],
-            queue: conversionQueue(team.plan),
             concurrencyKey: teamId,
           },
         );
@@ -161,7 +158,6 @@ export default async function handle(
               `document_${documentId}`,
               `version:${version.id}`,
             ],
-            queue: conversionQueue(team.plan),
             concurrencyKey: teamId,
           },
         );

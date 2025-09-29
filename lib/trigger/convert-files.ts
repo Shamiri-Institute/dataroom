@@ -1,4 +1,4 @@
-import { logger, retry, task } from "@trigger.dev/sdk/v3";
+import { logger, retry, task, queue } from "@trigger.dev/sdk";
 
 import { getFile } from "@/lib/files/get-file";
 import { putFileServer } from "@/lib/files/put-file-server";
@@ -14,12 +14,47 @@ export type ConvertPayload = {
   teamId: string;
 };
 
+// Define queues for v4 - one for each plan level
+export const conversionQueueFree = queue({
+  name: "conversion-free",
+  concurrencyLimit: 1,
+});
+
+export const conversionQueueStarter = queue({
+  name: "conversion-starter",
+  concurrencyLimit: 1,
+});
+
+export const conversionQueuePro = queue({
+  name: "conversion-pro",
+  concurrencyLimit: 2,
+});
+
+export const conversionQueueBusiness = queue({
+  name: "conversion-business",
+  concurrencyLimit: 10,
+});
+
+export const conversionQueueDatarooms = queue({
+  name: "conversion-datarooms",
+  concurrencyLimit: 10,
+});
+
+// Legacy queues for backward compatibility
+const convertFilesQueue = queue({
+  name: "convert-files-queue",
+  concurrencyLimit: 10,
+});
+
+const convertCadQueue = queue({
+  name: "convert-cad-queue",
+  concurrencyLimit: 2,
+});
+
 export const convertFilesToPdfTask = task({
   id: "convert-files-to-pdf",
   retry: { maxAttempts: 3 },
-  queue: {
-    concurrencyLimit: 10,
-  },
+  queue: convertFilesQueue,
   run: async (payload: ConvertPayload) => {
     updateStatus({ progress: 0, text: "Initializing..." });
 
@@ -29,8 +64,9 @@ export const convertFilesToPdfTask = task({
       },
     });
 
-    console.log("we found the team");
-    console.log({ team });
+    logger.log("we found the team")
+
+    logger.log(JSON.stringify(team));
 
     if (!team) {
       logger.error("Team not found", { teamId: payload.teamId });
@@ -57,8 +93,8 @@ export const convertFilesToPdfTask = task({
       },
     });
 
-    console.log("we have found the documents: ");
-    console.log({ document });
+    logger.log("we have found the documents: ");
+    logger.log(JSON.stringify(document));
 
     if (
       !document ||
@@ -83,10 +119,10 @@ export const convertFilesToPdfTask = task({
       type: document.versions[0].storageType,
     });
 
-    console.log("loading the process.env variables: ");
-    console.log(process.env);
-    console.log("fetching the fileUrl using the fileUrl function");
-    console.log({ fileUrl });
+    logger.log("loading the process.env variables: ");
+    logger.log(JSON.stringify(process.env));
+    logger.log("fetching the fileUrl using the fileUrl function");
+    logger.log(fileUrl);
 
     // Prepare form data
     const formData = new FormData();
@@ -101,7 +137,7 @@ export const convertFilesToPdfTask = task({
     formData.append("quality", "75");
 
     updateStatus({ progress: 20, text: "Converting document..." });
-    console.log("in the document conversion stage");
+    logger.log("in the document conversion stage");
 
     // Make the conversion request
     const conversionResponse = await retry.fetch(
@@ -218,9 +254,6 @@ export const convertFilesToPdfTask = task({
 export const convertCadToPdfTask = task({
   id: "convert-cad-to-pdf",
   retry: { maxAttempts: 3 },
-  queue: {
-    concurrencyLimit: 2,
-  },
   run: async (payload: ConvertPayload) => {
     const team = await prisma.team.findUnique({
       where: {
