@@ -445,7 +445,6 @@ export async function POST(request: NextRequest) {
         linkId,
       );
 
-      console.log("previewSession", previewSession);
       if (!previewSession) {
         return NextResponse.json(
           {

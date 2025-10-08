@@ -157,8 +157,6 @@ export default async function handle(
 
       const verifyParamsObject = Object.fromEntries(verifyParams.entries());
 
-      console.log({verifyParamsObject})
-
       const jwtToken = generateJWT(verifyParamsObject);
 
       const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify/invitation?token=${jwtToken}`;
@@ -173,7 +171,6 @@ export default async function handle(
 
       return res.status(200).json("Invitation sent!");
     } catch (error) {
-      console.log(error)
       errorhandler(error, res);
     }
   }

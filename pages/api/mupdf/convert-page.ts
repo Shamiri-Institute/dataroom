@@ -27,7 +27,6 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
   // Check if the API Key matches
   if (token !== process.env.INTERNAL_API_KEY) {
-    console.log("hello, the internal api key failed at this point");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }

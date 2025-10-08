@@ -27,7 +27,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 export default function DataroomsPage() {
-  console.log("here");
   const { datarooms } = useDatarooms();
   const { isFree, isPro, isBusiness, isDatarooms, isDataroomsPlus, isTrial } =
     usePlan();

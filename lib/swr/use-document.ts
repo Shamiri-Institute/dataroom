@@ -9,7 +9,6 @@ import { DocumentWithVersion, LinkWithViews } from "@/lib/types";
 import { fetcher } from "@/lib/utils";
 
 export function useDocument() {
-  console.log("we have leveraged useDocument====");
   const router = useRouter();
   const teamInfo = useTeam();
 

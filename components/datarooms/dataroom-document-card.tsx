@@ -100,7 +100,6 @@ export default function DataroomDocumentCard({
     event.stopPropagation();
     event.preventDefault();
 
-    console.log("isFirstClick", isFirstClick);
     if (isFirstClick) {
       handleRemoveDocument(documentId);
       setIsFirstClick(false);

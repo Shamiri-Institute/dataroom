@@ -196,7 +196,6 @@ export async function POST(request: NextRequest) {
         linkId,
       );
 
-      console.log("previewSession", previewSession);
       if (!previewSession) {
         return NextResponse.json(
           {
@@ -629,7 +628,6 @@ export async function POST(request: NextRequest) {
 
     // ** DATAROOM_VIEW **
     if (viewType === "DATAROOM_VIEW") {
-      console.log("viewType is DATAROOM_VIEW");
       try {
         let newDataroomView: { id: string } | null = null;
         if (!isPreview) {
