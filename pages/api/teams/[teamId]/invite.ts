@@ -71,17 +71,17 @@ export default async function handle(
       }
 
       // Check if the user has reached the limit of users in the team
-      const limits = await getLimits({
-        teamId,
-        userId: (session.user as CustomUser).id,
-      });
+      // const limits = await getLimits({
+      //   teamId,
+      //   userId: (session.user as CustomUser).id,
+      // });
 
-      if (limits && teamUsers.length >= limits.users) {
-        res
-          .status(403)
-          .json("You have reached the limit of users in your team");
-        return;
-      }
+      // if (limits && teamUsers.length >= limits.users) {
+      //   res
+      //     .status(403)
+      //     .json("You have reached the limit of users in your team");
+      //   return;
+      // }
 
       // check if user is already in the team
       const isExistingMember = teamUsers?.some(
@@ -157,6 +157,8 @@ export default async function handle(
 
       const verifyParamsObject = Object.fromEntries(verifyParams.entries());
 
+      console.log({verifyParamsObject})
+
       const jwtToken = generateJWT(verifyParamsObject);
 
       const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify/invitation?token=${jwtToken}`;
@@ -171,6 +173,7 @@ export default async function handle(
 
       return res.status(200).json("Invitation sent!");
     } catch (error) {
+      console.log(error)
       errorhandler(error, res);
     }
   }
