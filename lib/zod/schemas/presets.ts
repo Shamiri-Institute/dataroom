@@ -1,7 +1,14 @@
 import { z } from "zod";
 
 export const customFieldDataSchema = z.object({
-  type: z.enum(["SHORT_TEXT", "LONG_TEXT", "NUMBER", "URL"]),
+  type: z.enum([
+    "SHORT_TEXT",
+    "LONG_TEXT",
+    "NUMBER",
+    "PHONE_NUMBER",
+    "URL",
+    "CHECKBOX",
+  ]),
   identifier: z.string(),
   label: z.string(),
   placeholder: z.string().nullable().optional(),
@@ -57,10 +64,14 @@ export const presetDataSchema = z.object({
   expiresAt: z.string().nullable(),
   expiresIn: z.number().nullable().optional(),
   enableScreenshotProtection: z.boolean().optional(),
+  enableConfidentialView: z.boolean().optional(),
 
   // Agreement
   enableAgreement: z.boolean().optional(),
   agreementId: z.string().nullable().optional(),
+
+  // Banner
+  showBanner: z.boolean().optional(),
 });
 
 export type PresetDataSchema = z.infer<typeof presetDataSchema>;

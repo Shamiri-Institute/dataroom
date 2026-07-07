@@ -12,11 +12,12 @@ export const sendDataroomTrialEndEmail = async (params: {
   let subject;
 
   emailTemplate = DataroomTrialEnd({ name });
-  subject = "Your dataroom trial has ended";
+  subject = "Your Data Room Plus plan trial has ended";
 
   try {
     await sendEmail({
       to: email as string,
+      from: "Marc Seitz <marc@papermark.com>",
       subject,
       react: emailTemplate,
       test: process.env.NODE_ENV === "development",

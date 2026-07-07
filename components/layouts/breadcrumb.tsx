@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { useDataroom } from "@/lib/swr/use-dataroom";
+import { useDataroomDocumentOverview } from "@/lib/swr/use-dataroom-document";
 import { useDocument } from "@/lib/swr/use-document";
 import { useFolderWithParents } from "@/lib/swr/use-folders";
 import useViewer from "@/lib/swr/use-viewer";
@@ -165,7 +166,10 @@ const SingleDataroomBreadcrumb = ({ path }: { path: string }) => {
         return "Permissions";
       case "/datarooms/[id]/analytics":
         return "Analytics";
+      case "/datarooms/[id]/conversations/faqs":
+        return "FAQ";
       case "/datarooms/[id]/conversations":
+      case "/datarooms/[id]/conversations/[conversationId]":
         return "Conversations";
       case "/datarooms/[id]/settings/notifications":
         return "Notifications";
@@ -200,6 +204,41 @@ const SingleDataroomBreadcrumb = ({ path }: { path: string }) => {
   );
 };
 
+const SingleDataroomDocumentBreadcrumb = () => {
+  const { dataroom, document } = useDataroomDocumentOverview();
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/datarooms">Datarooms</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <TruncatedBreadcrumbLink
+            href={`/datarooms/${dataroom?.id}/documents`}
+            text={dataroom?.name}
+          />
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href={`/datarooms/${dataroom?.id}/documents`}>Documents</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage className="max-w-[200px] truncate">
+            {document?.name || "Loading..."}
+          </BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+};
+
 const SettingsBreadcrumb = () => {
   const router = useRouter();
   const path = router.pathname;
@@ -216,10 +255,14 @@ const SettingsBreadcrumb = () => {
         return "Presets";
       case "/settings/billing":
         return "Billing";
+      case "/settings/billing/invoices":
+        return "Invoices";
       case "/settings/tokens":
         return "API Tokens";
       case "/settings/webhooks":
         return "Webhooks";
+      case "/settings/slack":
+        return "Slack";
       case "/settings/incoming-webhooks":
         return "Incoming Webhooks";
       case "/settings/branding":
@@ -228,6 +271,8 @@ const SettingsBreadcrumb = () => {
         return "Settings";
     }
   }, [path]);
+
+  const isInvoicesPage = path === "/settings/billing/invoices";
 
   return (
     <Breadcrumb>
@@ -238,9 +283,23 @@ const SettingsBreadcrumb = () => {
           </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{settingsTitle}</BreadcrumbPage>
-        </BreadcrumbItem>
+        {isInvoicesPage ? (
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/settings/billing">Billing</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Invoices</BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        ) : (
+          <BreadcrumbItem>
+            <BreadcrumbPage>{settingsTitle}</BreadcrumbPage>
+          </BreadcrumbItem>
+        )}
       </BreadcrumbList>
     </Breadcrumb>
   );
@@ -254,8 +313,6 @@ const AccountBreadcrumb = () => {
     switch (path) {
       case "/account/general":
         return "General";
-      case "/account/security":
-        return "Security";
       default:
         return "Account";
     }
@@ -409,7 +466,7 @@ const AnalyticsBreadcrumb = () => {
       case "visitors":
         return "Visitors";
       case "views":
-        return "Recent Visits";
+        return "Recent Views";
       default:
         return "Analytics";
     }
@@ -486,6 +543,11 @@ export const AppBreadcrumb = () => {
     // Dataroom document routes
     if (path === "/datarooms/[id]/documents/[...name]" && id) {
       return <DataroomBreadcrumb />;
+    }
+
+    // Single dataroom document route
+    if (path === "/datarooms/[id]/document/[documentId]" && id) {
+      return <SingleDataroomDocumentBreadcrumb />;
     }
 
     // Single dataroom route

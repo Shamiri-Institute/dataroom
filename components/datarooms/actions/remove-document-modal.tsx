@@ -60,9 +60,7 @@ function RemoveDataroomItemsModal({
           ).then(async (res) => {
             if (!res.ok) {
               const error = await res.json();
-              throw new Error(
-                `Failed to remove dataroom document ${documentId}: ${error.message}`,
-              );
+              throw new Error(error.message || "Failed to remove dataroom document");
             }
             analytics.capture("Dataroom Document Removed", {
               team: teamInfo?.currentTeam?.id,
@@ -78,9 +76,7 @@ function RemoveDataroomItemsModal({
           ).then(async (res) => {
             if (!res.ok) {
               const error = await res.json();
-              throw new Error(
-                `Failed to remove folderId folder ${folderId}: ${error.message}`,
-              );
+              throw new Error(error.message || "Failed to remove dataroom folder");
             }
             analytics.capture("Dataroom folder Removed", {
               team: teamInfo?.currentTeam?.id,
@@ -105,10 +101,10 @@ function RemoveDataroomItemsModal({
 
         // Call mutate only once, after all deletions
         await mutate(
-          `/api/teams/${teamInfo?.currentTeam?.id}/datarooms/${dataroomId}${folderPathName ? `/folders/documents/${folderPathName.join("/")}` : "/documents"}`,
+          `/api/teams/${teamInfo?.currentTeam?.id}/datarooms/${dataroomId}${folderPathName ? `/folder-documents/${folderPathName.join("/")}` : "/documents"}`,
         );
         mutate(
-          `/api/teams/${teamInfo?.currentTeam?.id}/datarooms/${dataroomId}/folders${folderPathName ? `/${folderPathName.join(" / ")}` : "?root=true"}`,
+          `/api/teams/${teamInfo?.currentTeam?.id}/datarooms/${dataroomId}/folders${folderPathName ? `/${folderPathName.join("/")}` : "?root=true"}`,
         );
         mutate(
           `/api/teams/${teamInfo?.currentTeam?.id}/datarooms/${dataroomId}/folders`,

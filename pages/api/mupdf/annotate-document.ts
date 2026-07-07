@@ -1,238 +1,59 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
-import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
+import { getFileNameWithPdfExtension, log } from "@/lib/utils";
+import {
+  type ViewerData,
+  type WatermarkConfig,
+  buildWatermarkedPdf,
+} from "@/lib/utils/watermark-pdf";
 
-import { hexToRgb, log, safeTemplateReplace } from "@/lib/utils";
-
-// This function can run for a maximum of 120 seconds
+// This function can run for a maximum of 300 seconds
 export const config = {
-  maxDuration: 180,
+  maxDuration: 300,
 };
 
-interface WatermarkConfig {
-  text: string;
-  isTiled: boolean;
-  position:
-    | "top-left"
-    | "top-center"
-    | "top-right"
-    | "middle-left"
-    | "middle-center"
-    | "middle-right"
-    | "bottom-left"
-    | "bottom-center"
-    | "bottom-right";
-  rotation: 0 | 30 | 45 | 90 | 180;
-  color: string;
-  fontSize: number;
-  opacity: number; // 0 to 0.8
-}
+/**
+ * Validates a URL to prevent SSRF attacks.
+ * Only allows HTTPS requests to the configured distribution hosts.
+ */
+function validateUrl(urlString: string): URL {
+  let parsedUrl: URL;
 
-interface ViewerData {
-  email: string;
-  date: string;
-  ipAddress: string;
-  link: string;
-  time: string;
-}
-
-function getPositionCoordinates(
-  position: WatermarkConfig["position"],
-  width: number,
-  height: number,
-  textWidth: number,
-  textHeight: number,
-): number[] {
-  const positions = {
-    "top-left": [10, height - textHeight],
-    "top-center": [(width - textWidth) / 2, height - textHeight],
-    "top-right": [width - textWidth - 10, height - textHeight],
-    "middle-left": [10, (height - textHeight) / 2],
-    "middle-center": [(width - textWidth) / 2, (height - textHeight) / 2],
-    "middle-right": [width - textWidth - 10, (height - textHeight) / 2],
-    "bottom-left": [10, 20],
-    "bottom-center": [(width - textWidth) / 2, 20],
-    "bottom-right": [width - textWidth - 10, 20],
-  };
-  return positions[position];
-}
-
-async function insertWatermark(
-  pdfDoc: PDFDocument,
-  config: WatermarkConfig,
-  viewerData: ViewerData,
-  pageIndex: number,
-): Promise<void> {
-  const pages = pdfDoc.getPages();
-  const page = pages[pageIndex];
-  const { width, height } = page.getSize();
-
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-  // Safely replace template variables with whitelisted values only
-  const rawWatermarkText = safeTemplateReplace(config.text, viewerData);
-
-  // Handle Unicode characters that can't be encoded in WinAnsi
-  const sanitizeText = (text: string): string => {
-    // Common character replacements for WinAnsi compatibility
-    const replacements: { [key: string]: string } = {
-      // Turkish characters
-      İ: "I",
-      ı: "i",
-      ğ: "g",
-      Ğ: "G",
-      ü: "u",
-      Ü: "U",
-      ş: "s",
-      Ş: "S",
-      ç: "c",
-      Ç: "C",
-      ö: "o",
-      Ö: "O",
-      // German characters
-      ß: "ss",
-      ä: "a",
-      Ä: "A",
-      ë: "e",
-      Ë: "E",
-      // French characters
-      à: "a",
-      À: "A",
-      é: "e",
-      É: "E",
-      è: "e",
-      È: "E",
-      ê: "e",
-      Ê: "E",
-      ù: "u",
-      Ù: "U",
-      ô: "o",
-      Ô: "O",
-      // Spanish characters
-      ñ: "n",
-      Ñ: "N",
-      á: "a",
-      Á: "A",
-      í: "i",
-      Í: "I",
-      ó: "o",
-      Ó: "O",
-      ú: "u",
-      Ú: "U",
-      // Common symbols
-      "€": "EUR",
-      "£": "GBP",
-      "¥": "JPY",
-      "©": "(c)",
-      "®": "(R)",
-      "™": "TM",
-      "…": "...",
-      "–": "-",
-      "—": "-",
-      "\u201C": '"',
-      "\u201D": '"',
-      "\u2018": "'",
-      "\u2019": "'",
-      "•": "*",
-    };
-
-    let sanitized = text;
-
-    // Apply character replacements
-    for (const [original, replacement] of Object.entries(replacements)) {
-      sanitized = sanitized.replace(new RegExp(original, "g"), replacement);
-    }
-
-    // Replace any remaining non-WinAnsi characters (outside Latin-1 range)
-    sanitized = sanitized.replace(/[^\u0000-\u00FF]/g, "?");
-
-    return sanitized;
-  };
-
-  const watermarkText = sanitizeText(rawWatermarkText);
-
-  // Calculate a responsive font size
-  const calculateFontSize = () => {
-    const baseFontSize = Math.min(width, height) * (config.fontSize / 1000);
-    return Math.max(8, Math.min(baseFontSize, config.fontSize));
-  };
-  const fontSize = calculateFontSize();
-
-  // Calculate text dimensions with error handling
-  let textWidth: number;
-  let textHeight: number;
-
+  // Parse the URL
   try {
-    textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
-    textHeight = font.heightAtSize(fontSize);
+    parsedUrl = new URL(urlString);
   } catch (error) {
-    // If there are still encoding issues, provide fallback values
-    console.warn("Font encoding error:", error);
-    textWidth = watermarkText.length * fontSize * 0.6; // Approximate width
-    textHeight = fontSize * 1.2; // Approximate height
+    throw new Error("Invalid URL format");
   }
 
-  if (config.isTiled) {
-    const patternWidth = textWidth / 1.1;
-    const patternHeight = textHeight * 15;
+  // Validate protocol - only HTTPS allowed
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error("Only HTTPS URLs are allowed");
+  }
 
-    // Calculate the offset to center the pattern
-    const offsetX = -patternWidth / 4;
-    const offsetY = -patternHeight / 4;
+  // Get allowed distribution hosts from environment
+  const allowedHosts = [
+    process.env.NEXT_PRIVATE_UPLOAD_DISTRIBUTION_HOST,
+    process.env.NEXT_PRIVATE_UPLOAD_DISTRIBUTION_HOST_US,
+  ].filter((host): host is string => !!host);
 
-    const maxTilesPerRow = Math.ceil(width / patternWidth) + 1;
-    const maxTilesPerColumn = Math.ceil(height / patternHeight) + 1;
+  if (allowedHosts.length === 0) {
+    throw new Error("No distribution hosts configured");
+  }
 
-    for (let i = 0; i < maxTilesPerRow; i++) {
-      for (let j = 0; j < maxTilesPerColumn; j++) {
-        const x = i * patternWidth + offsetX;
-        const y = j * patternHeight + offsetY;
+  // Validate hostname against allow-list
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const isAllowedHost = allowedHosts.some(
+    (allowedHost) => hostname === allowedHost.toLowerCase(),
+  );
 
-        try {
-          page.drawText(watermarkText, {
-            x,
-            y,
-            size: fontSize,
-            font,
-            color: hexToRgb(config.color) ?? rgb(0, 0, 0),
-            opacity: config.opacity,
-            rotate: degrees(config.rotation),
-          });
-        } catch (error) {
-          console.error("Error drawing tiled watermark text:", error);
-          throw new Error(
-            `Failed to apply watermark to page ${pageIndex + 1}: ${error}`,
-          );
-        }
-      }
-    }
-  } else {
-    const [x, y] = getPositionCoordinates(
-      config.position,
-      width,
-      height,
-      textWidth,
-      textHeight,
+  if (!isAllowedHost) {
+    throw new Error(
+      "Host not allowed. Only requests to configured distribution hosts are permitted",
     );
-
-    try {
-      page.drawText(watermarkText, {
-        x,
-        y,
-        size: fontSize,
-        font,
-        color: hexToRgb(config.color) ?? rgb(0, 0, 0),
-        opacity: config.opacity,
-        rotate: degrees(config.rotation),
-      });
-    } catch (error) {
-      console.error("Error drawing positioned watermark text:", error);
-      throw new Error(
-        `Failed to apply watermark to page ${pageIndex + 1}: ${error}`,
-      );
-    }
   }
+
+  return parsedUrl;
 }
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -252,65 +73,193 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     return;
   }
 
-  const { url, watermarkConfig, viewerData, numPages } = req.body as {
+  const {
+    url,
+    watermarkConfig,
+    viewerData,
+    numPages,
+    originalFileName,
+    fileType = "pdf",
+    flatten = false,
+  } = req.body as {
     url: string;
     watermarkConfig: WatermarkConfig;
     viewerData: ViewerData;
     numPages: number;
+    originalFileName?: string;
+    fileType?: "pdf" | "image";
+    flatten?: boolean;
   };
 
+  // Validate required fields
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "Invalid or missing URL" });
+  }
+
+  if (!watermarkConfig || typeof watermarkConfig !== "object") {
+    return res
+      .status(400)
+      .json({ error: "Invalid or missing watermark config" });
+  }
+
+  if (fileType !== "image" && fileType !== "pdf") {
+    return res.status(400).json({ error: "Invalid file type" });
+  }
+
+  // Images are always a single page; PDFs need a valid page count.
+  const effectiveNumPages = fileType === "image" ? 1 : numPages;
+
+  if (fileType === "pdf") {
+    if (
+      !effectiveNumPages ||
+      typeof effectiveNumPages !== "number" ||
+      effectiveNumPages <= 0
+    ) {
+      return res.status(400).json({ error: "Invalid page count" });
+    }
+
+    if (effectiveNumPages > 1000) {
+      return res.status(400).json({
+        error: "Document too large",
+        details: "Maximum 1000 pages supported",
+      });
+    }
+  }
+
+  const startTime = Date.now();
+
+  // Validate URL to prevent SSRF attacks
+  let validatedUrl: URL;
   try {
-    // Fetch the PDF data
+    validatedUrl = validateUrl(url);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log({
+      message: `URL validation failed: ${errorMsg}\nAttempted URL: ${url}`,
+      type: "error",
+      mention: false,
+    });
+    return res.status(400).json({
+      error: "Invalid URL",
+      details: errorMsg,
+    });
+  }
+
+  try {
+    // Fetch the source file (PDF or image) with timeout
     let response: Response;
     try {
-      response = await fetch(url);
+      const fetchStart = Date.now();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for fetch
+
+      // Use the validated URL string for the fetch
+      response = await fetch(validatedUrl.toString(), {
+        signal: controller.signal,
+        headers: {
+          Accept: fileType === "image" ? "image/*" : "application/pdf",
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      console.log(`Source fetch took ${Date.now() - fetchStart}ms`);
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       log({
-        message: `Failed to fetch PDF in conversion process with error: \n\n Error: ${error}`,
+        message: `Failed to fetch source file in watermarking process with error: \n\n Error: ${errorMsg}\nURL: ${url}`,
         type: "error",
         mention: true,
       });
-      throw new Error(`Failed to fetch pdf`);
+
+      if (errorMsg.includes("aborted")) {
+        throw new Error(`Timeout fetching file (exceeded 60s)`);
+      }
+      throw new Error(`Failed to fetch file: ${errorMsg}`);
     }
+
+    const contentType =
+      response.headers.get("content-type") ?? undefined;
 
     // Convert the response to a buffer
-    const pdfBuffer = await response.arrayBuffer();
+    const bufferStart = Date.now();
+    const fileBuffer = await response.arrayBuffer();
+    const sizeInMB = fileBuffer.byteLength / 1024 / 1024;
+    console.log(
+      `Buffer conversion took ${Date.now() - bufferStart}ms, size: ${sizeInMB.toFixed(2)}MB`,
+    );
 
-    // Load the PDF document
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pdfBytes = await buildWatermarkedPdf({
+      fileBytes: new Uint8Array(fileBuffer),
+      fileType,
+      watermarkConfig,
+      viewerData,
+      numPages: effectiveNumPages,
+      flatten,
+      imageContentType: contentType,
+      onProgress: (message) => console.log(message),
+    });
 
-    // Register fontkit
-    pdfDoc.registerFontkit(fontkit);
-
-    // Add watermark to each page
-    for (let i = 0; i < numPages; i++) {
-      await insertWatermark(pdfDoc, watermarkConfig, viewerData, i);
-    }
-
-    // Save the modified PDF
-    const pdfBytes = await pdfDoc.save();
+    console.log(
+      `Total processing time: ${Date.now() - startTime}ms for ${effectiveNumPages} page(s)${flatten ? " (flattened)" : ""}`,
+    );
 
     // Set appropriate headers
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      'attachment; filename="watermarked.pdf"',
+      `attachment; filename="${encodeURIComponent(getFileNameWithPdfExtension(originalFileName))}"`,
     );
 
     res.status(200).send(Buffer.from(pdfBytes));
 
     return;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const elapsedTime = Date.now() - startTime;
+
+    // Determine appropriate status code based on error type
+    let statusCode = 500;
+    let errorType = "Failed to apply watermark";
+
+    if (errorMessage.includes("Timeout") || errorMessage.includes("timeout")) {
+      statusCode = 504;
+      errorType = "Request timeout";
+    } else if (
+      errorMessage.includes("too large") ||
+      errorMessage.includes("Maximum")
+    ) {
+      statusCode = 413;
+      errorType = "Document too large";
+    } else if (
+      errorMessage.includes("fetch") ||
+      errorMessage.includes("HTTP")
+    ) {
+      statusCode = 502;
+      errorType = "Failed to fetch document";
+    } else if (errorMessage.includes("Unsupported image format")) {
+      statusCode = 415;
+      errorType = "Unsupported image format";
+    } else if (errorMessage.includes("Failed to apply watermark")) {
+      statusCode = 500;
+      errorType = "Watermarking error";
+    }
+
     log({
-      message: `Failed to convert page with error: \n\n Error: ${error}`,
+      message: `${errorType} after ${elapsedTime}ms: ${errorMessage}\n\nDocument: ${originalFileName || "unknown"}\nPages: ${effectiveNumPages}\nURL: ${url?.substring(0, 100)}...`,
       type: "error",
-      mention: true,
+      mention: elapsedTime > 120000, // Only mention if it took more than 2 minutes
     });
 
-    // Return proper error response instead of throwing
-    res.status(500).json({
-      error: "Failed to apply watermark",
-      details: (error as Error).message,
+    // Return proper error response
+    res.status(statusCode).json({
+      error: errorType,
+      details: errorMessage,
+      processingTime: elapsedTime,
     });
     return;
   }

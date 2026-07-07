@@ -35,18 +35,16 @@ export default async function handle(
 
     try {
       // Check if the user is part of the team
-      const team = await prisma.team.findUnique({
+      const teamAccess = await prisma.userTeam.findUnique({
         where: {
-          id: teamId,
-          users: {
-            some: {
-              userId: userId,
-            },
+          userId_teamId: {
+            userId: userId,
+            teamId: teamId,
           },
         },
       });
 
-      if (!team) {
+      if (!teamAccess) {
         return res.status(401).end("Unauthorized");
       }
 
@@ -71,13 +69,21 @@ export default async function handle(
         where: {
           teamId: teamId,
           parentId: parentFolder.id,
+          hiddenInAllDocuments: false, // Exclude hidden folders from All Documents folder tree
         },
         orderBy: {
           name: "asc",
         },
         include: {
           _count: {
-            select: { documents: true, childFolders: true },
+            select: {
+              documents: {
+                where: { hiddenInAllDocuments: false },
+              },
+              childFolders: {
+                where: { hiddenInAllDocuments: false },
+              },
+            },
           },
         },
       });

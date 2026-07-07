@@ -4,10 +4,14 @@ import {
   BUSINESS_PLAN_LIMITS,
   DATAROOMS_PLAN_LIMITS,
   DATAROOMS_PLUS_PLAN_LIMITS,
+  DATAROOMS_PREMIUM_PLAN_LIMITS,
+  DATAROOMS_UNLIMITED_PLAN_LIMITS,
   PRO_PLAN_LIMITS,
 } from "@/ee/limits/constants";
 import Stripe from "stripe";
 
+import { clearTeamDomainRedirects } from "@/lib/api/domains/clear-team-redirects";
+import { planSupportsRedirects } from "@/lib/api/domains/redis";
 import prisma from "@/lib/prisma";
 import { log } from "@/lib/utils";
 
@@ -25,10 +29,10 @@ export async function customerSubsciptionUpdated(
 
   if (!plan) {
     await log({
-      message: `Invalid price ID in customer.subscription.updated event: ${priceId}`,
+      message: `Invalid price ID in customer.subscription.updated event: ${priceId}, isOldAccount: ${isOldAccount}. Skipping webhook processing to prevent unintended plan changes.`,
       type: "error",
     });
-    return;
+    return res.status(200).json({ received: true });
   }
 
   const stripeId = subscriptionUpdated.customer.toString();
@@ -50,8 +54,12 @@ export async function customerSubsciptionUpdated(
 
   const newPlan = plan.slug;
   const subscriptionId = subscriptionUpdated.id;
-  const startsAt = new Date(subscriptionUpdated.current_period_start * 1000);
-  const endsAt = new Date(subscriptionUpdated.current_period_end * 1000);
+  const startsAt = new Date(
+    (subscriptionUpdated as any).current_period_start * 1000,
+  );
+  const endsAt = new Date(
+    (subscriptionUpdated as any).current_period_end * 1000,
+  );
   const quantity = subscriptionUpdated.items.data[0].quantity;
 
   let teamPlan = team.plan;
@@ -66,7 +74,9 @@ export async function customerSubsciptionUpdated(
       | typeof PRO_PLAN_LIMITS
       | typeof BUSINESS_PLAN_LIMITS
       | typeof DATAROOMS_PLAN_LIMITS
-      | typeof DATAROOMS_PLUS_PLAN_LIMITS = structuredClone(PRO_PLAN_LIMITS);
+      | typeof DATAROOMS_PLUS_PLAN_LIMITS
+      | typeof DATAROOMS_PREMIUM_PLAN_LIMITS
+      | typeof DATAROOMS_UNLIMITED_PLAN_LIMITS = structuredClone(PRO_PLAN_LIMITS);
     if (plan.slug === "pro") {
       planLimits = structuredClone(PRO_PLAN_LIMITS);
     } else if (plan.slug === "business") {
@@ -75,6 +85,10 @@ export async function customerSubsciptionUpdated(
       planLimits = structuredClone(DATAROOMS_PLAN_LIMITS);
     } else if (plan.slug === "datarooms-plus") {
       planLimits = structuredClone(DATAROOMS_PLUS_PLAN_LIMITS);
+    } else if (plan.slug === "datarooms-premium") {
+      planLimits = structuredClone(DATAROOMS_PREMIUM_PLAN_LIMITS);
+    } else if (plan.slug === "datarooms-unlimited") {
+      planLimits = structuredClone(DATAROOMS_UNLIMITED_PLAN_LIMITS);
     }
 
     // Update the user limit in planLimits based on the subscription quantity
@@ -94,6 +108,10 @@ export async function customerSubsciptionUpdated(
         limits: planLimits,
       },
     });
+
+    if (!planSupportsRedirects(newPlan)) {
+      await clearTeamDomainRedirects(team.id);
+    }
   }
 
   // If new account, and the plan is the same, but the quantity is different, update the quantity

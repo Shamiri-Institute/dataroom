@@ -1,45 +1,105 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { useTeam } from "@/context/team-context";
 import { PlanEnum } from "@/ee/stripe/constants";
-import { PlusIcon } from "lucide-react";
+import { FilterIcon, PlusIcon } from "lucide-react";
+import { useQueryState } from "nuqs";
 
+import { useSelfMembership } from "@/lib/hooks/use-self-membership";
 import { usePlan } from "@/lib/swr/use-billing";
 import useDatarooms from "@/lib/swr/use-datarooms";
 import useLimits from "@/lib/swr/use-limits";
+import { useTags } from "@/lib/swr/use-tags";
 import { daysLeft } from "@/lib/utils";
 
 import { UpgradePlanModal } from "@/components/billing/upgrade-plan-modal";
 import { AddDataroomModal } from "@/components/datarooms/add-dataroom-modal";
+import DataroomCard from "@/components/datarooms/dataroom-card";
 import { DataroomTrialModal } from "@/components/datarooms/dataroom-trial-modal";
 import { EmptyDataroom } from "@/components/datarooms/empty-dataroom";
 import AppLayout from "@/components/layouts/app";
+import { SearchBoxPersisted } from "@/components/search-box";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { MultiSelect } from "@/components/ui/multi-select-v2";
 import { Separator } from "@/components/ui/separator";
 
 export default function DataroomsPage() {
-  const { datarooms } = useDatarooms();
-  const { isFree, isPro, isBusiness, isDatarooms, isDataroomsPlus, isTrial } =
-    usePlan();
+  const teamInfo = useTeam();
+  const { datarooms, totalCount } = useDatarooms();
+  const {
+    isFree,
+    isPro,
+    isBusiness,
+    isDatarooms,
+    isDataroomsPlus,
+    isTrial,
+    trialEndsAt,
+  } = usePlan();
   const { limits } = useLimits();
   const router = useRouter();
 
-  const numDatarooms = datarooms?.length ?? 0;
+  // Dataroom-scoped members cannot create datarooms; hide the creation controls.
+  const { isDataroomMember } = useSelfMembership();
+
+  const [tagsFilter, setTagsFilter] = useQueryState<string[]>("tags", {
+    parse: (value: string) => value.split(",").filter(Boolean),
+    serialize: (value: string[]) => value.join(","),
+  });
+  const [isTagsPopoverOpen, setIsTagsPopoverOpen] = useState(false);
+
+  const { tags: availableTags } = useTags({
+    query: {
+      sortBy: "name",
+      sortOrder: "asc",
+    },
+  });
+
+  const totalDatarooms = totalCount ?? 0;
   const limitDatarooms = limits?.datarooms ?? 1;
 
   const canCreateUnlimitedDatarooms =
     isDatarooms ||
     isDataroomsPlus ||
-    (isBusiness && numDatarooms < limitDatarooms);
+    (isBusiness && totalDatarooms < limitDatarooms);
+
+  const searchQuery = router.query.search as string | undefined;
+
+  // Sort datarooms alphabetically by name
+  const sortedDatarooms = datarooms?.slice().sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
+
+  const selectedTagValues = useMemo(() => {
+    return tagsFilter || [];
+  }, [tagsFilter]);
+
+  // Only surface tags that are actually applied to a dataroom the user can see.
+  // Team tags that aren't attached to any visible dataroom would never match a
+  // filter, so showing them is just noise (and leaks unrelated tags to
+  // dataroom-scoped members). Selected tags are always kept so an active filter
+  // doesn't vanish when it narrows the result set.
+  const visibleTagNames = useMemo(() => {
+    const names = new Set<string>(selectedTagValues);
+    (datarooms ?? []).forEach((dataroom) => {
+      dataroom.tags?.forEach((tagItem) => names.add(tagItem.tag.name));
+    });
+    return names;
+  }, [datarooms, selectedTagValues]);
+
+  const tagOptions = useMemo(() => {
+    return (availableTags ?? [])
+      .filter((tag) => visibleTagNames.has(tag.name))
+      .map((tag) => ({
+        value: tag.name,
+        label: tag.name,
+        meta: { color: tag.color, description: tag.description },
+      }));
+  }, [availableTags, visibleTagNames]);
+
+  const hasActiveFilters = searchQuery || tagsFilter?.length;
 
   return (
     <AppLayout>
@@ -54,67 +114,85 @@ export default function DataroomsPage() {
             </p>
           </div>
           <div className="flex items-center gap-x-1">
-            <AddDataroomModal>
-              <Button
-                className="group flex flex-1 items-center justify-start gap-x-3 px-3 text-left"
-                title="Create New Document"
-              >
-                <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span>Create New Dataroom</span>
-              </Button>
-            </AddDataroomModal>
+            {isDataroomMember ? null : (
+              <AddDataroomModal>
+                <Button
+                  className="group flex flex-1 items-center justify-start gap-x-1 whitespace-nowrap px-2 text-left sm:gap-x-3 sm:px-3"
+                  title="Create New Dataroom"
+                >
+                  <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <span className="text-xs sm:text-sm">New Dataroom</span>
+                </Button>
+              </AddDataroomModal>
+            )}
           </div>
         </section>
+        {/* Search and Filters */}
+        <div className="mb-4 flex justify-end gap-2 sm:gap-3">
+          <div className="w-full sm:w-[280px]">
+            <SearchBoxPersisted
+              placeholder="Search datarooms..."
+              inputClassName="h-9 text-sm sm:h-10"
+            />
+          </div>
+
+          <div className="w-full sm:w-[320px]">
+            <MultiSelect
+              options={tagOptions}
+              value={selectedTagValues}
+              onValueChange={(value) =>
+                setTagsFilter(value.length > 0 ? value : null)
+              }
+              placeholder="Tags"
+              maxCount={2}
+              searchPlaceholder="Search tags..."
+              isPopoverOpen={isTagsPopoverOpen}
+              setIsPopoverOpen={setIsTagsPopoverOpen}
+              popoverClassName="sm:w-[320px]"
+            />
+          </div>
+        </div>
+
+        {hasActiveFilters && (
+          <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              Showing {sortedDatarooms?.length || 0} of {totalDatarooms}{" "}
+              dataroom
+              {totalDatarooms !== 1 ? "s" : ""}
+            </span>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-xs"
+              onClick={() => {
+                router.push(
+                  {
+                    pathname: router.pathname,
+                    query: {},
+                  },
+                  undefined,
+                  { shallow: true },
+                );
+              }}
+            >
+              Clear filters
+            </Button>
+          </div>
+        )}
 
         <Separator className="mb-5 bg-gray-200 dark:bg-gray-800" />
 
         <div className="space-y-4">
           <ul className="grid grid-cols-1 gap-x-6 gap-y-8 lg:grid-cols-2 xl:grid-cols-3">
-            {datarooms &&
-              datarooms.map((dataroom) => (
-                <Link
-                  key={dataroom.id}
-                  href={`/datarooms/${dataroom.id}/documents`}
-                >
-                  <Card className="group relative overflow-hidden duration-500 hover:border-primary/50">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="truncate">
-                          {dataroom.name}
-                        </CardTitle>
-                      </div>
-                      {/* <CardDescription>{dataroom.pId}</CardDescription> */}
-                    </CardHeader>
-                    <CardContent>
-                      <dl className="divide-y divide-gray-100 text-sm leading-6">
-                        <div className="flex justify-between gap-x-4 py-3">
-                          <dt className="text-gray-500 dark:text-gray-400">
-                            Documents
-                          </dt>
-                          <dd className="flex items-start gap-x-2">
-                            <div className="font-medium text-gray-900 dark:text-gray-200">
-                              {dataroom._count.documents ?? 0}
-                            </div>
-                          </dd>
-                        </div>
-                        <div className="flex justify-between gap-x-4 py-3">
-                          <dt className="text-gray-500 dark:text-gray-400">
-                            Views
-                          </dt>
-                          <dd className="flex items-start gap-x-2">
-                            <div className="font-medium text-gray-900 dark:text-gray-200">
-                              {dataroom._count.views ?? 0}
-                            </div>
-                          </dd>
-                        </div>
-                      </dl>
-                    </CardContent>
-                  </Card>
-                </Link>
+            {sortedDatarooms &&
+              sortedDatarooms.map((dataroom) => (
+                <li key={dataroom.id}>
+                  <DataroomCard dataroom={dataroom} />
+                </li>
               ))}
           </ul>
 
-          {datarooms && datarooms.length === 0 && (
+          {sortedDatarooms && sortedDatarooms.length === 0 && (
             <div className="flex items-center justify-center">
               <EmptyDataroom />
             </div>

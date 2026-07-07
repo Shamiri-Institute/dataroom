@@ -26,14 +26,62 @@ export default async function handle(
     }
 
     const { teamId } = req.query as { teamId: string };
+    const userId = (session.user as CustomUser).id;
 
-    const { email } = req.body;
+    const { email, role: rawRole, dataroomIds: rawDataroomIds } = req.body as {
+      email?: string;
+      role?: string;
+      dataroomIds?: string[];
+    };
 
     if (!email) {
       return res.status(400).json("Email is missing in request body");
     }
 
+    const ALLOWED_INVITE_ROLES = [
+      "ADMIN",
+      "MANAGER",
+      "MEMBER",
+      "DATAROOM_MEMBER",
+    ] as const;
+    const role =
+      rawRole && ALLOWED_INVITE_ROLES.includes(rawRole as any)
+        ? (rawRole as (typeof ALLOWED_INVITE_ROLES)[number])
+        : "MEMBER";
+    const dataroomIds =
+      role === "DATAROOM_MEMBER" && Array.isArray(rawDataroomIds)
+        ? Array.from(new Set(rawDataroomIds.filter((id) => typeof id === "string")))
+        : [];
+
+    if (role === "DATAROOM_MEMBER" && dataroomIds.length === 0) {
+      return res
+        .status(400)
+        .json("Select at least one data room for a data room member.");
+    }
+
     try {
+      const userTeam = await prisma.userTeam.findUnique({
+        where: {
+          userId_teamId: {
+            userId,
+            teamId,
+          },
+        },
+        select: {
+          role: true,
+        },
+      });
+
+      if (!userTeam) {
+        res.status(403).json("You are not part of this team");
+        return;
+      }
+
+      if (userTeam.role !== "ADMIN") {
+        res.status(403).json("Only admins can send the invitation!");
+        return;
+      }
+
       const team = await prisma.team.findUnique({
         where: {
           id: teamId,
@@ -58,25 +106,15 @@ export default async function handle(
         return;
       }
 
-      // check that the user is admin of the team, otherwise return 403
       const teamUsers = team.users;
-      const isUserAdmin = teamUsers.some(
-        (user) =>
-          user.role === "ADMIN" &&
-          user.userId === (session.user as CustomUser).id,
-      );
-      if (!isUserAdmin) {
-        res.status(403).json("Only admins can send the invitation!");
-        return;
-      }
 
       // Check if the user has reached the limit of users in the team
       // const limits = await getLimits({
       //   teamId,
-      //   userId: (session.user as CustomUser).id,
+      //   userId,
       // });
 
-      // if (limits && teamUsers.length >= limits.users) {
+      // if (limits && limits.users !== null && teamUsers.length >= limits.users) {
       //   res
       //     .status(403)
       //     .json("You have reached the limit of users in your team");
@@ -108,6 +146,19 @@ export default async function handle(
         return;
       }
 
+      // Validate that any selected datarooms belong to this team.
+      if (dataroomIds.length > 0) {
+        const validDatarooms = await prisma.dataroom.findMany({
+          where: { id: { in: dataroomIds }, teamId },
+          select: { id: true },
+        });
+        if (validDatarooms.length !== dataroomIds.length) {
+          return res
+            .status(400)
+            .json("One or more selected data rooms are invalid.");
+        }
+      }
+
       const token = newId("inv");
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 168); // 7 days // invitation expires in 24 hour
@@ -119,6 +170,8 @@ export default async function handle(
           token,
           expires: expiresAt,
           teamId,
+          role,
+          dataroomIds,
         },
       });
 
@@ -157,7 +210,7 @@ export default async function handle(
 
       const verifyParamsObject = Object.fromEntries(verifyParams.entries());
 
-      const jwtToken = generateJWT(verifyParamsObject);
+      const jwtToken = generateJWT(verifyParamsObject, 60 * 60 * 24 * 7); // 7 days
 
       const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify/invitation?token=${jwtToken}`;
 

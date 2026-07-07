@@ -7,6 +7,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 
 import { TeamContextType, initialState, useTeam } from "@/context/team-context";
+import { PlanEnum } from "@/ee/stripe/constants";
 import Cookies from "js-cookie";
 import {
   BrushIcon,
@@ -16,14 +17,19 @@ import {
   HouseIcon,
   Loader,
   ServerIcon,
+  WorkflowIcon,
 } from "lucide-react";
 
+import { useFeatureFlags } from "@/lib/hooks/use-feature-flags";
+import { useIsAdmin } from "@/lib/hooks/use-is-admin";
+import { useSelfMembership } from "@/lib/hooks/use-self-membership";
 import { usePlan } from "@/lib/swr/use-billing";
+import useDataroomsSimple from "@/lib/swr/use-datarooms-simple";
 import useLimits from "@/lib/swr/use-limits";
+import { useSlackIntegration } from "@/lib/swr/use-slack-integration";
 import { nFormatter } from "@/lib/utils";
 
 import { NavMain } from "@/components/sidebar/nav-main";
-import { NavUser } from "@/components/sidebar/nav-user";
 import { TeamSwitcher } from "@/components/sidebar/team-switcher";
 import {
   Sidebar,
@@ -34,19 +40,40 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+import ProBanner from "../billing/pro-banner";
 import { Progress } from "../ui/progress";
+import SlackBanner from "./banners/slack-banner";
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebarContent() {
   const router = useRouter();
-  const [, setShowProBanner] = useState<boolean | null>(null);
-  const [, setShowProAnnualBanner] = useState<boolean | null>(null);
+  const [showProBanner, setShowProBanner] = useState<boolean | null>(null);
+  const [showSlackBanner, setShowSlackBanner] = useState<boolean | null>(null);
   const { currentTeam, teams, setCurrentTeam, isLoading }: TeamContextType =
     useTeam() || initialState;
-  const { plan: userPlan, isDataroomsPlus, isFree, isTrial } = usePlan();
+  const { isBusiness, isDatarooms, isDataroomsPlus, isFree, isTrial } =
+    usePlan();
 
   const { limits } = useLimits();
   const linksLimit = undefined;
   const documentsLimit = undefined;
+
+  // Check Slack integration status
+  const { integration: slackIntegration } = useSlackIntegration({
+    enabled: !!currentTeam?.id,
+  });
+
+  // Check feature flags
+  const { features } = useFeatureFlags();
+
+  // Check if current user is admin (for gating Security)
+  const { isAdmin } = useIsAdmin();
+
+  // Dataroom-scoped members only ever see their assigned datarooms.
+  const { isDataroomMember } = useSelfMembership();
+
+  // Fetch datarooms for the current team (simple mode - no filters or extra data)
+  // For scoped members the API already restricts this to their assigned rooms.
+  const { datarooms } = useDataroomsSimple();
 
   useEffect(() => {
     if (Cookies.get("hideProBanner") !== "pro-banner") {
@@ -54,12 +81,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     } else {
       setShowProBanner(false);
     }
-    if (Cookies.get("hideProAnnualBanner") !== "pro-annual-banner") {
-      setShowProAnnualBanner(true);
+    if (Cookies.get("hideSlackBanner") !== "slack-banner") {
+      setShowSlackBanner(true);
     } else {
-      setShowProAnnualBanner(false);
+      setShowSlackBanner(false);
     }
   }, []);
+
+  // Prepare datarooms items for sidebar (limit to first 5, sorted by most recent)
+  const dataroomItems =
+    datarooms && datarooms.length > 0
+      ? datarooms.slice(0, 5).map((dataroom) => ({
+          title: dataroom.internalName || dataroom.name,
+          url: `/datarooms/${dataroom.id}/documents`,
+          current:
+            router.pathname.includes("/datarooms/[id]") &&
+            String(router.query.id) === String(dataroom.id),
+        }))
+      : undefined;
 
   const data = {
     navMain: [
@@ -81,21 +120,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         title: "All Datarooms",
         url: "/datarooms",
         icon: ServerIcon,
-        current: router.pathname.includes("datarooms"),
-        // disabled: !isBusiness && !isDatarooms && !isDataroomsPlus && !isTrial,
+        current: router.pathname === "/datarooms",
+        disabled: !isBusiness && !isDatarooms && !isDataroomsPlus && !isTrial,
         trigger: "sidebar_datarooms",
-        //plan: PlanEnum.Business,
+        plan: PlanEnum.Business,
         highlightItem: ["datarooms"],
+        isActive:
+          router.pathname.includes("datarooms") &&
+          (isBusiness || isDatarooms || isDataroomsPlus || isTrial),
+        items:
+          isBusiness || isDatarooms || isDataroomsPlus || isTrial
+            ? dataroomItems
+            : undefined,
       },
       {
         title: "Visitors",
         url: "/visitors",
         icon: ContactIcon,
         current: router.pathname.includes("visitors"),
-        //disabled: isFree && !isTrial,
+        disabled: isFree && !isTrial,
         trigger: "sidebar_visitors",
-        //plan: PlanEnum.Pro,
+        plan: PlanEnum.Pro,
         highlightItem: ["visitors"],
+      },
+      {
+        title: "Workflows",
+        url: "/workflows",
+        icon: WorkflowIcon,
+        current: router.pathname.includes("/workflows"),
+        disabled: !features?.workflows,
+        trigger: "sidebar_workflows",
+        plan: PlanEnum.DataRoomsPlus,
+        highlightItem: ["workflows"],
       },
       {
         title: "Branding",
@@ -106,7 +162,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           !router.pathname.includes("datarooms"),
       },
       {
-        title: "Settings",
+        title: "General Settings",
         url: "/settings/general",
         icon: CogIcon,
         isActive:
@@ -131,10 +187,34 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             current: router.pathname.includes("settings/domains"),
           },
           {
+            title: "Notifications",
+            url: "/settings/notifications",
+            current: router.pathname.includes("settings/notifications"),
+          },
+          {
+            title: "Slack",
+            url: "/settings/slack",
+            current: router.pathname.includes("settings/slack"),
+          },
+          {
             title: "Webhooks",
             url: "/settings/webhooks",
             current: router.pathname.includes("settings/webhooks"),
           },
+          {
+            title: "API Keys",
+            url: "/settings/tokens",
+            current: router.pathname.includes("settings/tokens"),
+          },
+          ...(isAdmin
+            ? [
+                {
+                  title: "Security",
+                  url: "/settings/security",
+                  current: router.pathname.includes("settings/security"),
+                },
+              ]
+            : []),
           {
             title: "Billing",
             url: "/settings/billing",
@@ -145,37 +225,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ],
   };
 
+  // Filter out items that should be hidden based on feature flags
+  let filteredNavMain = data.navMain.filter((item) => {
+    if (item.title === "Workflows" && !features?.workflows) {
+      return false;
+    }
+    return true;
+  });
+
+  // Dataroom-scoped members get a single Datarooms section listing only their
+  // assigned rooms. Dashboard, All Documents, Visitors, Workflows, Branding and
+  // Settings are hidden — they have no access to those areas.
+  if (isDataroomMember) {
+    const scopedDataroomItems =
+      datarooms && datarooms.length > 0
+        ? datarooms.map((dataroom) => ({
+            title: dataroom.internalName || dataroom.name,
+            url: `/datarooms/${dataroom.id}/documents`,
+            current:
+              router.pathname.includes("/datarooms/[id]") &&
+              String(router.query.id) === String(dataroom.id),
+          }))
+        : undefined;
+
+    filteredNavMain = [
+      {
+        title: "Data Rooms",
+        url: "/datarooms",
+        icon: ServerIcon,
+        current: router.pathname === "/datarooms",
+        isActive: router.pathname.includes("datarooms"),
+        items: scopedDataroomItems,
+      },
+    ] as typeof filteredNavMain;
+  }
+
   return (
-    <Sidebar
-      className="bg-gray-50 dark:bg-black"
-      sidebarClassName="bg-gray-50 dark:bg-black"
-      side="left"
-      variant="inset"
-      collapsible="icon"
-      {...props}
-    >
-      <SidebarHeader className="gap-y-8">
-        <p className="hidden w-full justify-center text-2xl font-bold tracking-tighter text-black group-data-[collapsible=icon]:inline-flex dark:text-white">
-          <Link href="/dashboard">P</Link>
-        </p>
-        <p className="ml-2 flex items-center text-2xl font-bold tracking-tighter text-black group-data-[collapsible=icon]:hidden dark:text-white">
-          <Link href="/dashboard">Papermark</Link>
-          {userPlan && !isFree && !isDataroomsPlus ? (
-            <span className="ml-4 rounded-full bg-background px-2.5 py-1 text-xs tracking-normal text-foreground ring-1 ring-gray-800">
-              {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)}
-            </span>
-          ) : null}
-          {isDataroomsPlus ? (
-            <span className="ml-4 rounded-full bg-background px-2.5 py-1 text-xs tracking-normal text-foreground ring-1 ring-gray-800">
-              Datarooms+
-            </span>
-          ) : null}
-          {isTrial ? (
-            <span className="ml-2 rounded-sm bg-foreground px-2 py-0.5 text-xs tracking-normal text-background ring-1 ring-gray-800">
-              Trial
-            </span>
-          ) : null}
-        </p>
+    <>
+      <SidebarHeader className="gap-y-0 pt-0">
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm">
             <Loader className="h-5 w-5 animate-spin" /> Loading teams...
@@ -189,12 +276,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={filteredNavMain} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu className="group-data-[collapsible=icon]:hidden">
           <SidebarMenuItem>
             <div>
+              {!slackIntegration && showSlackBanner ? (
+                <SlackBanner setShowSlackBanner={setShowSlackBanner} />
+              ) : null}
+              {isFree && !isTrial && showProBanner ? (
+                <ProBanner setShowProBanner={setShowProBanner} />
+              ) : null}
+
               <div className="mb-2">
                 {linksLimit ? (
                   <UsageProgress
@@ -214,15 +308,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 ) : null}
                 {linksLimit || documentsLimit ? (
                   <p className="mt-2 px-2 text-xs text-muted-foreground">
-                    Change plan to increase usage limits
+                    <Link
+                      href="/settings/billing/upgrade"
+                      className="font-medium text-foreground underline-offset-2 hover:underline"
+                    >
+                      Change plan
+                    </Link>{" "}
+                    to increase limits
                   </p>
                 ) : null}
               </div>
             </div>
           </SidebarMenuItem>
         </SidebarMenu>
-        <NavUser />
       </SidebarFooter>
+    </>
+  );
+}
+
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  return (
+    <Sidebar
+      className="bg-gray-50 dark:bg-black"
+      sidebarClassName="bg-gray-50 dark:bg-black"
+      side="left"
+      variant="inset"
+      collapsible="icon"
+      {...props}
+    >
+      <AppSidebarContent />
     </Sidebar>
   );
 }

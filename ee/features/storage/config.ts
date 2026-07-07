@@ -3,6 +3,7 @@ import { getFeatureFlags } from "@/lib/featureFlags";
 export interface StorageConfig {
   bucket: string;
   advancedBucket?: string;
+  archiveBucket: string;
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
@@ -18,7 +19,7 @@ export type StorageRegion = "eu-central-1" | "us-east-2" | "af-south-1";
 
 /**
  * Gets AWS storage configuration based on the storage region.
- * Uses environment variables with _US suffix for US region, no suffix for EU region.
+ * Shamiri: single storage configuration — always uses the unsuffixed env vars.
  *
  * @param storageRegion - The storage region ('us-east-2' for US, defaults to 'eu-central-1' for EU)
  * @returns StorageConfig object with all necessary AWS configuration
@@ -59,9 +60,19 @@ export function getStorageConfig(storageRegion?: string): StorageConfig {
     return process.env[regionVar] || (isUS ? "us-east-2" : "eu-central-1");
   };
 
+  const getArchiveBucket = () => {
+    const archiveBucketVar = `NEXT_PRIVATE_ARCHIVE_BUCKET`;
+    const archiveBucket = process.env[archiveBucketVar];
+    if (!archiveBucket) {
+      throw new Error(`Missing environment variable: ${archiveBucketVar}`);
+    }
+    return archiveBucket;
+  };
+
   return {
     bucket: getBucket(),
     advancedBucket: process.env[`NEXT_PRIVATE_ADVANCED_UPLOAD_BUCKET`],
+    archiveBucket: getArchiveBucket(),
     region: getRegion(),
     accessKeyId: getAccessKeyId(),
     secretAccessKey: getSecretAccessKey(),

@@ -66,7 +66,8 @@ export interface LinkWithViews extends Link {
   feedback: { id: true; data: { question: string; type: string } } | null;
   customFields: CustomField[];
   tags: TagProps[];
-  uploadFolderName: string | undefined;
+  uploadFolders?: { id: string; name: string; path: string | null }[];
+  visitorGroups?: { visitorGroupId: string }[];
 }
 
 export interface LinkWithDocument extends Link {
@@ -132,6 +133,7 @@ export interface LinkWithDataroom extends Link {
       folderId: string | null;
       updatedAt: Date;
       orderIndex: number | null;
+      hierarchicalIndex: string | null;
       document: {
         id: string;
         name: string;
@@ -307,13 +309,16 @@ export interface Team {
   plan?: string;
   createdAt?: Date;
   enableExcelAdvancedMode?: boolean;
+  replicateDataroomFolders?: boolean;
 }
+
+export type TeamRole = "ADMIN" | "MANAGER" | "MEMBER" | "DATAROOM_MEMBER";
 
 export interface TeamDetail {
   id: string;
   name: string;
   users: {
-    role: "ADMIN" | "MANAGER" | "MEMBER";
+    role: TeamRole;
     status: "ACTIVE" | "BLOCKED_TRIAL_EXPIRED";
     teamId: string;
     userId: string;
@@ -327,6 +332,11 @@ export interface TeamDetail {
       name: string;
       id: string;
     };
+  }[];
+  // Per-member dataroom assignments (scoped DATAROOM_MEMBER role).
+  userDatarooms?: {
+    userId: string;
+    dataroomId: string;
   }[];
 }
 
@@ -368,6 +378,8 @@ export type BasePlan =
   | "business"
   | "datarooms"
   | "datarooms-plus"
+  | "datarooms-premium"
+  | "datarooms-unlimited"
   | "enterprise";
 
 export const tagColors = [

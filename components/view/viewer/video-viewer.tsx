@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { ConfidentialViewOverlay } from "@/ee/features/permissions/components/confidential-view/confidential-view-overlay";
 import { toast } from "sonner";
 
 import { createVideoTracker } from "@/lib/tracking/video-tracking";
@@ -7,16 +8,18 @@ import { cn } from "@/lib/utils";
 
 import { ScreenProtector } from "../ScreenProtection";
 import Nav, { TNavData } from "../nav";
-import { VideoPlayer } from "./video-player";
+import { MediaPlayer } from "./video-player";
 
 export default function VideoViewer({
   file,
   screenshotProtectionEnabled,
+  confidentialViewEnabled,
   versionNumber,
   navData,
 }: {
   file: string;
   screenshotProtectionEnabled: boolean;
+  confidentialViewEnabled?: boolean;
   versionNumber: number;
   navData: TNavData;
 }) {
@@ -109,13 +112,14 @@ export default function VideoViewer({
         )}
       >
         <div className="relative flex h-full w-full items-center justify-center">
-          <VideoPlayer
+          <MediaPlayer
             ref={videoRef}
-            videoSrc={file}
+            mediaSrc={file}
             onError={handleVideoError}
             preventDownload={!allowDownload}
           />
           {screenshotProtectionEnabled && <ScreenProtector />}
+          {confidentialViewEnabled ? <ConfidentialViewOverlay /> : null}
         </div>
       </div>
     </>
