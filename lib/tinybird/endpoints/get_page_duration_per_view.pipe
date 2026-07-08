@@ -1,4 +1,4 @@
-VERSION 4
+VERSION 5
 
 NODE endpoint
 SQL >
@@ -12,6 +12,7 @@ SQL >
         documentId = {{ String(documentId, required=True) }}
         AND viewId = {{ String(viewId, required=True) }}
         AND time >= {{ Int64(since, required=True) }}
+        {% if defined(until) %} AND time <= {{ Int64(until) }} {% end %}
     GROUP BY
         pageNumber
     ORDER BY
