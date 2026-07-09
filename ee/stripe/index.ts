@@ -1,33 +1,40 @@
 import Stripe from "stripe";
 
-const stripeOld = new Stripe(
-  process.env.STRIPE_SECRET_KEY_LIVE_OLD ??
-    process.env.STRIPE_SECRET_KEY_OLD ??
-    "",
-  {
-    apiVersion: "2024-06-20" as any,
-    appInfo: {
-      name: "Papermark.io",
-      version: "0.1.0",
-    },
-    typescript: true,
-  },
-);
-
-const stripeNew = new Stripe(
-  process.env.STRIPE_SECRET_KEY_LIVE ?? process.env.STRIPE_SECRET_KEY ?? "",
-  {
-    apiVersion: "2024-06-20" as any,
-    appInfo: {
-      name: "Papermark.io",
-      version: "0.1.0",
-    },
-    typescript: true,
-  },
-);
+// Shamiri: instantiate lazily so importing this module doesn't throw when
+// Stripe env vars are unset (billing is de-gated in this fork).
+let stripeOld: Stripe | undefined;
+let stripeNew: Stripe | undefined;
 
 export const stripeInstance = (account: boolean = false) => {
-  return account ? stripeOld : stripeNew;
+  if (account) {
+    stripeOld ??= new Stripe(
+      process.env.STRIPE_SECRET_KEY_LIVE_OLD ??
+        process.env.STRIPE_SECRET_KEY_OLD ??
+        "",
+      {
+        apiVersion: "2024-06-20" as any,
+        appInfo: {
+          name: "Papermark.io",
+          version: "0.1.0",
+        },
+        typescript: true,
+      },
+    );
+    return stripeOld;
+  }
+
+  stripeNew ??= new Stripe(
+    process.env.STRIPE_SECRET_KEY_LIVE ?? process.env.STRIPE_SECRET_KEY ?? "",
+    {
+      apiVersion: "2024-06-20" as any,
+      appInfo: {
+        name: "Papermark.io",
+        version: "0.1.0",
+      },
+      typescript: true,
+    },
+  );
+  return stripeNew;
 };
 
 export async function cancelSubscription(

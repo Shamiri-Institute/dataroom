@@ -105,8 +105,10 @@ Two strategies used here, in order of preference:
 
 - Several upstream modules threw at import time without env vars; made lazy in
   the fork: OpenAI clients (`lib/openai.ts`, `ee/features/ai/lib/models/openai.ts`),
-  Slack (`lib/integrations/slack/events.ts`). Host-gated rules in
-  `next.config.mjs` are emitted only when their env vars are set.
+  Slack (`lib/integrations/slack/events.ts`), Stripe (`ee/stripe/index.ts` —
+  clients memoized inside `stripeInstance()`; the eager `new Stripe("")` threw at
+  import and 500'd every `/api/auth/*` route when `STRIPE_SECRET_KEY*` are unset).
+  Host-gated rules in `next.config.mjs` are emitted only when their env vars are set.
 - `npm run build` works without any env vars (Upstash/QStash warnings are
   non-fatal). Type-checking is clean (`npx tsc --noEmit`) — keep it that way;
   upstream's public repo is NOT type-clean, so expect to patch new type errors

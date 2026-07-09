@@ -53,6 +53,19 @@ export default async function handler(
     return res.status(403).json({ error: "Access denied" });
   }
 
+  // Shamiri: no Slack app is configured on this self-hosted instance —
+  // getSlackEnv() throws without SLACK_* env vars. Report "not installed"
+  // instead of a 500 so the integrations page renders.
+  try {
+    getSlackEnv();
+  } catch {
+    return req.method === "GET"
+      ? res.status(404).json({ error: "Slack integration not found" })
+      : res
+          .status(501)
+          .json({ error: "Slack integration is not configured on this server" });
+  }
+
   switch (req.method) {
     case "GET":
       return handleGet(req, res, teamId);
