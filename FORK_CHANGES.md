@@ -85,7 +85,7 @@ Two strategies used here, in order of preference:
 
 1. **Stub the missing module** (keeps upstream's newer components). Stubs live at
    the exact import paths and are marked with `// Shamiri stub:`:
-   `ee/features/branding/lib/{dataroom-viewer-layout,dataroom-banner,use-logo-tone,resolve-public-link-meta}`,
+   `ee/features/branding/lib/{dataroom-viewer-layout,dataroom-banner,use-logo-tone,resolve-public-link-meta,use-branding-preview-params,dataroom-preview-presets}`,
    `ee/features/conversations/components/viewer/conversation-sidebar-provider`,
    `ee/features/request-lists/{components/viewer/*,lib/events,lib/swr/use-viewer-request-list}`,
    `ee/features/permissions/components/confidential-view/{-overlay,-section}`,
@@ -98,8 +98,10 @@ Two strategies used here, in order of preference:
    `pages/api/teams/index.ts`, `remove-teammate.ts`, `datarooms/trial.ts`,
    `domains/[domain]/verify.ts`, `pages/settings/presets/*`,
    `pages/datarooms/[id]/settings/index.tsx`. Deleted: request-list tasks page,
-   dataroom questions API, conversation-mention job, ppreview demo pages,
-   passkey/security pages.
+   dataroom questions API, conversation-mention job, passkey/security pages.
+   (The ppreview demo pages were initially deleted too, but the pinned branding
+   pages embed them in preview iframes — they were re-adopted verbatim from
+   upstream with the two branding stubs above backing them.)
 
 ## Build requirements (self-hosted)
 
