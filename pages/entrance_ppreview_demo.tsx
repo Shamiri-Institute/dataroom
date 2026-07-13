@@ -1,17 +1,15 @@
-import { useRouter } from "next/router";
+import type { CSSProperties } from "react";
 
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-
-import { determineTextColor } from "@/lib/utils/determine-text-color";
+import { useBrandingPreviewParams } from "@/ee/features/branding/lib/use-branding-preview-params";
+import { createAdaptiveSurfacePalette } from "@/lib/utils/create-adaptive-surface-palette";
 
 import { Button } from "@/components/ui/button";
 
 export default function ViewPage() {
-  const router = useRouter();
-  const { accentColor, welcomeMessage } = router.query as {
-    accentColor: string;
-    welcomeMessage?: string;
-  };
+  // Seeded from the URL on first paint, then live-updated over postMessage so
+  // the editor never has to reload (and therefore never flashes) this iframe.
+  const { accentColor, welcomeMessage } = useBrandingPreviewParams();
+  const palette = createAdaptiveSurfacePalette(accentColor);
 
   return (
     <div className="bg-gray-950" style={{ backgroundColor: accentColor }}>
@@ -23,7 +21,7 @@ export default function ViewPage() {
           <h1
             className="mt-16 text-2xl font-bold leading-9 tracking-tight text-white"
             style={{
-              color: determineTextColor(accentColor),
+              color: palette.textColor,
             }}
           >
             {welcomeMessage || "Your action is requested to continue"}
@@ -38,7 +36,7 @@ export default function ViewPage() {
                   htmlFor="email"
                   className="block text-sm font-medium leading-6 text-white"
                   style={{
-                    color: determineTextColor(accentColor),
+                    color: palette.textColor,
                   }}
                 >
                   Email address
@@ -50,13 +48,19 @@ export default function ViewPage() {
                   autoCorrect="off"
                   autoComplete="email"
                   autoFocus
-                  className="flex w-full rounded-md border-0 bg-black py-1.5 text-white shadow-sm ring-1 ring-inset ring-gray-600 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-gray-300 sm:text-sm sm:leading-6"
-                  style={{ backgroundColor: accentColor }}
+                  className="flex w-full cursor-text rounded-md border-0 bg-black py-1.5 text-white shadow-sm ring-1 ring-inset ring-gray-600 placeholder:text-[var(--access-placeholder)] focus:ring-2 focus:ring-inset focus:ring-[var(--access-input-focus)] sm:text-sm sm:leading-6"
+                  style={{
+                    backgroundColor: palette.controlBgColor,
+                    borderColor: palette.controlBorderColor,
+                    "--access-placeholder": palette.controlPlaceholderColor,
+                    "--access-input-focus": palette.controlBorderStrongColor,
+                    color: palette.textColor,
+                  } as CSSProperties}
                   placeholder="Enter email"
                   aria-invalid="true"
                   data-1p-ignore
                 />
-                <p className="text-sm text-gray-500">
+                <p className="text-sm" style={{ color: palette.subtleTextColor }}>
                   This data will be shared with the sender.
                 </p>
               </div>

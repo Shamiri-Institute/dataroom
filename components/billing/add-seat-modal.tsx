@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { useRouter } from "next/router";
 
 import { useEffect, useState } from "react";
 
+import { UnlimitedPlanModal } from "@/components/billing/unlimited-plan-modal";
 import { useTeam } from "@/context/team-context";
 import { getPriceIdFromPlan } from "@/ee/stripe/functions/get-price-id-from-plan";
 import { getQuantityFromPriceId } from "@/ee/stripe/functions/get-quantity-from-plan";
@@ -37,17 +39,18 @@ export function AddSeatModal({
   const teamInfo = useTeam();
   const teamId = teamInfo?.currentTeam?.id;
   const analytics = useAnalytics();
-  const { plan: userPlan, planName, isAnnualPlan } = usePlan();
+  const { plan: userPlan, planName, isAnnualPlan, isOldAccount } = usePlan();
   const { limits } = useLimits();
 
   const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Get the minimum quantity for the current plan
-  const priceId = getPriceIdFromPlan(
-    planName,
-    isAnnualPlan ? "yearly" : "monthly",
-  );
+  const priceId = getPriceIdFromPlan({
+    planSlug: userPlan,
+    isOld: isOldAccount,
+    period: isAnnualPlan ? "yearly" : "monthly",
+  });
   const minQuantity = getQuantityFromPriceId(priceId);
 
   // Set initial quantity to 1 (adding one seat)
@@ -58,7 +61,9 @@ export function AddSeatModal({
   }, [open]);
 
   // Calculate the total number of seats after the update
-  const totalSeatsAfterUpdate = limits ? limits.users! + quantity : quantity;
+  const totalSeatsAfterUpdate = limits?.users && limits.users !== Infinity
+    ? limits.users + quantity
+    : quantity;
 
   const handleDecrement = () => {
     if (quantity > 1) {
@@ -157,8 +162,10 @@ export function AddSeatModal({
 
           {limits && (
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              Current limit: {limits.users}{" "}
-              {limits.users === 1 ? "user" : "users"}
+              Current limit:{" "}
+              {limits.users === Infinity || limits.users === null
+                ? "Unlimited"
+                : `${limits.users} ${limits.users === 1 ? "user" : "users"}`}
             </p>
           )}
 
@@ -174,15 +181,27 @@ export function AddSeatModal({
 
           {minQuantity > 1 && (
             <p className="mt-2 text-center text-sm text-muted-foreground">
-              Minimum quantity for {planName}: {minQuantity} users
+              Your {planName} plan includes {minQuantity} seats
             </p>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex flex-col gap-2 sm:flex-col sm:justify-center">
           <Button onClick={handleSubmit} className="w-full" disabled={loading}>
             {loading ? "Redirecting..." : "Proceed to checkout"}
           </Button>
+          <Link
+            href="/settings/billing/upgrade"
+            className="block w-full text-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={() => setOpen(false)}
+          >
+            or upgrade to higher plan
+          </Link>
+          <UnlimitedPlanModal>
+            <p className="cursor-pointer text-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+              Interested in unlimited seats?
+            </p>
+          </UnlimitedPlanModal>
         </DialogFooter>
       </DialogContent>
     </Dialog>

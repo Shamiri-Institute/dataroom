@@ -1,8 +1,9 @@
 import { JSXElementConstructor, ReactElement } from "react";
 
-import { render } from "@react-email/components";
+import { render, toPlainText } from "react-email";
 import { Resend } from "resend";
 
+import prisma from "@/lib/prisma";
 import { log, nanoid } from "@/lib/utils";
 
 export const resend = process.env.RESEND_API_KEY
@@ -41,7 +42,8 @@ export const sendEmail = async ({
     throw new Error("Resend not initialized");
   }
 
-  const plainText = await render(react, { plainText: true });
+  const html = await render(react);
+  const plainText = toPlainText(html);
 
   const fromAddress =
     from ??
@@ -67,7 +69,12 @@ export const sendEmail = async ({
       text: plainText,
       headers: {
         "X-Entity-Ref-ID": nanoid(),
-        ...(unsubscribeUrl ? { "List-Unsubscribe": unsubscribeUrl } : {}),
+        ...(unsubscribeUrl
+          ? {
+              "List-Unsubscribe": `<${unsubscribeUrl}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            }
+          : {}),
       },
     });
 
@@ -92,4 +99,55 @@ export const sendEmail = async ({
     });
     throw exception; // Rethrow the caught exception
   }
+};
+
+export const subscribe = async (email: string): Promise<void> => {
+  if (!resend) {
+    console.error("RESEND_API_KEY is not set in the .env. Skipping.");
+    return;
+  }
+
+  const { data, error } = await resend.contacts.create({
+    email,
+  });
+
+  if (error || !data?.id) {
+    console.error("Failed to create contact:", error);
+    return;
+  }
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.RESEND_MARKETING_SEGMENT_ID
+  ) {
+    await resend.contacts.segments.add({
+      contactId: data.id,
+      segmentId: process.env.RESEND_MARKETING_SEGMENT_ID as string,
+    });
+  }
+};
+
+export const unsubscribe = async (email: string): Promise<void> => {
+  if (!resend) {
+    console.error("RESEND_API_KEY is not set in the .env. Skipping.");
+    return;
+  }
+
+  if (!email) {
+    return;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { email: true },
+  });
+
+  if (!user || !user.email) {
+    return;
+  }
+
+  await resend.contacts.update({
+    email: user.email,
+    unsubscribed: true,
+  });
 };

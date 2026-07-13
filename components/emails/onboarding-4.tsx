@@ -11,7 +11,7 @@ import {
   Section,
   Tailwind,
   Text,
-} from "@react-email/components";
+} from "react-email";
 
 const Onboarding4Email = () => {
   const previewText = `The document sharing infrastructure for the modern web`;
@@ -33,22 +33,19 @@ const Onboarding4Email = () => {
               Look professional with custom branding!
             </Text>
             <Text className="text-sm">With Papermark you can:</Text>
-            <Text className="text-sm">
-              <ul className="list-inside list-disc text-sm">
-                <li>
-                  Share documnets with your{" "}
-                  <strong>custom domain💫</strong>{" "}
-                </li>
+            <ul className="list-inside list-disc text-sm">
+              <li>
+                Share documnets with your <strong>custom domain💫</strong>{" "}
+              </li>
 
-                <li>Remove &quot;powered by Papermark&quot;</li>
-                <li>Add logo and custom colors</li>
-                <li>Share data room with custom domain</li>
-                <li>Add banner and custom brand to data rooms</li>
-              </ul>
-              <Text className="text-sm">
-                (Customization for data rooms is seaprate and available in each
-                data room you create)
-              </Text>
+              <li>Remove &quot;powered by Papermark&quot;</li>
+              <li>Add logo and custom colors</li>
+              <li>Share data room with custom domain</li>
+              <li>Add banner and custom brand to data rooms</li>
+            </ul>
+            <Text className="text-sm">
+              (Customization for data rooms is seaprate and available in each
+              data room you create)
             </Text>
             {/* <Text className="text-sm">You can also use Bulk upload</Text> */}
             <Section className="mb-[32px] mt-[32px] text-center">
@@ -76,7 +73,7 @@ const Onboarding4Email = () => {
                 © {new Date().getFullYear()}{" "}
                 <a
                   href="https://www.papermark.com"
-                  className="text-gray-400 no-underline hover:text-gray-400"
+                  className="text-gray-400 no-underline"
                   target="_blank"
                 >
                   papermark.com

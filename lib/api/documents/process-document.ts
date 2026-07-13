@@ -1,14 +1,16 @@
-import { parsePageId } from "notion-utils";
-
+import { validateExternalDocumentUrl } from "@/lib/api/documents/validate-external-url";
 import { DocumentData } from "@/lib/documents/create-document";
 import { copyFileToBucketServer } from "@/lib/files/copy-file-to-bucket-server";
-import notion from "@/lib/notion";
 import prisma from "@/lib/prisma";
-import { convertCadToPdfTask } from "@/lib/trigger/convert-files";
-import { convertFilesToPdfTask } from "@/lib/trigger/convert-files";
+import {
+  convertFilesToPdfTask,
+  convertKeynoteToPdfTask,
+} from "@/lib/trigger/convert-files";
 import { processVideo } from "@/lib/trigger/optimize-video-files";
 import { convertPdfToImageRoute } from "@/lib/trigger/pdf-to-image-route";
 import { getExtension } from "@/lib/utils";
+import { isMarkdownFile } from "@/lib/utils/get-content-type";
+import { conversionQueueName } from "@/lib/utils/trigger-utils";
 import { sendDocumentCreatedWebhook } from "@/lib/webhook/triggers/document-created";
 import { sendLinkCreatedWebhook } from "@/lib/webhook/triggers/link-created";
 
@@ -18,6 +20,7 @@ type ProcessDocumentParams = {
   teamPlan: string;
   userId?: string;
   folderPathName?: string;
+  folderId?: string | null;
   createLink?: boolean;
   isExternalUpload?: boolean;
 };
@@ -28,6 +31,7 @@ export const processDocument = async ({
   teamPlan,
   userId,
   folderPathName,
+  folderId,
   createLink = false,
   isExternalUpload = false,
 }: ProcessDocumentParams) => {
@@ -45,34 +49,44 @@ export const processDocument = async ({
   // Get passed type property or alternatively, the file extension and save it as the type
   const type = supportedFileType || getExtension(name);
 
-  // Check whether the Notion page is publically accessible or not
-  if (type === "notion") {
-    try {
-      const pageId = parsePageId(key, { uuid: false });
-      // if the page isn't accessible then end the process here.
-      if (!pageId) {
-        throw new Error("Notion page not found");
-      }
-      await notion.getPage(pageId);
-    } catch (error) {
-      throw new Error("This Notion page isn't publically available.");
-    }
-  }
+  // For notion/link documents, validate the external URL (Notion page must be
+  // public; link URLs must be well-formed and not blocked). No-op otherwise.
+  await validateExternalDocumentUrl({ type, key, teamId });
 
-  const folder = await prisma.folder.findUnique({
-    where: {
-      teamId_path: {
-        teamId,
-        path: "/" + folderPathName,
-      },
-    },
-    select: {
-      id: true,
-    },
-  });
+  // `folderId` (resolved by callers like the public v1 API) wins over the
+  // path-based lookup; the path lookup remains for the dashboard upload flow
+  // which still passes `folderPathName` referring to a pre-existing folder.
+  const folder = folderId
+    ? { id: folderId }
+    : folderPathName
+      ? await prisma.folder.findUnique({
+          where: {
+            teamId_path: {
+              teamId,
+              path: "/" + folderPathName,
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+
+  const isDownloadOnlyByExtension =
+    /\.(log|err|prj|jgw|tif|tiff|ecw|bak|xlsb|sav|shp|shx|dbf|sbn|sbx|qix|cpg)$/i.test(
+      name,
+    );
+
+  const isMarkdown = isMarkdownFile({ name, contentType });
 
   // determine if the document is download only
-  const isDownloadOnly = type === "zip" || type === "map" || type === "email";
+  const isDownloadOnly =
+    type === "zip" ||
+    type === "map" ||
+    type === "email" ||
+    type === "other" ||
+    contentType === "text/tab-separated-values" ||
+    type === "cad" ||
+    isMarkdown ||
+    isDownloadOnlyByExtension;
 
   // Save data to the database
   const document = await prisma.document.create({
@@ -92,6 +106,7 @@ export const processDocument = async ({
         links: {
           create: {
             teamId,
+            ownerId: userId,
           },
         },
       }),
@@ -118,7 +133,34 @@ export const processDocument = async ({
   });
 
   // Trigger appropriate conversion tasks based on document type
-  if (type === "docs" || type === "slides") {
+  // Check if it's a Keynote file (slides type with Keynote content type)
+  if (
+    type === "slides" &&
+    (contentType === "application/vnd.apple.keynote" ||
+      contentType === "application/x-iwork-keynote-sffkey")
+  ) {
+    await convertKeynoteToPdfTask.trigger(
+      {
+        documentId: document.id,
+        documentVersionId: document.versions[0].id,
+        teamId,
+      },
+      {
+        idempotencyKey: `${teamId}-${document.versions[0].id}-keynote`,
+        tags: [
+          `team_${teamId}`,
+          `document_${document.id}`,
+          `version:${document.versions[0].id}`,
+        ],
+        queue: conversionQueueName(teamPlan),
+        concurrencyKey: teamId,
+      },
+    );
+  } else if (
+    (type === "docs" || type === "slides") &&
+    !isDownloadOnlyByExtension &&
+    !isMarkdown
+  ) {
     await convertFilesToPdfTask.trigger(
       {
         documentId: document.id,
@@ -132,31 +174,17 @@ export const processDocument = async ({
           `document_${document.id}`,
           `version:${document.versions[0].id}`,
         ],
+        queue: conversionQueueName(teamPlan),
         concurrencyKey: teamId,
       },
     );
   }
 
-  if (type === "cad") {
-    await convertCadToPdfTask.trigger(
-      {
-        documentId: document.id,
-        documentVersionId: document.versions[0].id,
-        teamId,
-      },
-      {
-        idempotencyKey: `${teamId}-${document.versions[0].id}-cad`,
-        tags: [
-          `team_${teamId}`,
-          `document_${document.id}`,
-          `version:${document.versions[0].id}`,
-        ],
-        concurrencyKey: teamId,
-      },
-    );
-  }
-
-  if (type === "video" && contentType !== "video/mp4") {
+  if (
+    type === "video" &&
+    contentType !== "video/mp4" &&
+    contentType?.startsWith("video/")
+  ) {
     await processVideo.trigger(
       {
         videoUrl: key,
@@ -172,6 +200,7 @@ export const processDocument = async ({
           `document_${document.id}`,
           `version:${document.versions[0].id}`,
         ],
+        queue: conversionQueueName(teamPlan),
         concurrencyKey: teamId,
       },
     );
@@ -192,6 +221,7 @@ export const processDocument = async ({
           `document_${document.id}`,
           `version:${document.versions[0].id}`,
         ],
+        queue: conversionQueueName(teamPlan),
         concurrencyKey: teamId,
       },
     );

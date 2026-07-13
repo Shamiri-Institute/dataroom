@@ -2,21 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { reportDeniedAccessAttempt } from "@/ee/features/access-notifications";
 import { getTeamStorageConfigById } from "@/ee/features/storage/config";
-// Import authOptions directly from the source
-import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { ipAddress, waitUntil } from "@vercel/functions";
 import { getServerSession } from "next-auth";
 
 import { hashToken } from "@/lib/api/auth/token";
+import { authOptions } from "@/lib/auth/auth-options";
+import {
+  collectFingerprintHeaders,
+  generateSessionFingerprint,
+} from "@/lib/auth/dataroom-auth";
+import {
+  createLinkSession,
+  getLinkSessionCookieName,
+} from "@/lib/auth/link-session";
 import { verifyPreviewSession } from "@/lib/auth/preview-auth";
 import { PreviewSession } from "@/lib/auth/preview-auth";
+import { isEmbeddableUrl } from "@/lib/edge-config/embeddable-domains";
 import { sendOtpVerificationEmail } from "@/lib/emails/send-email-otp-verification";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getFile } from "@/lib/files/get-file";
 import { newId } from "@/lib/id-helper";
+import { notifyDocumentView } from "@/lib/integrations/slack/events";
 import prisma from "@/lib/prisma";
 import { ratelimit } from "@/lib/redis";
 import { parseSheet } from "@/lib/sheet";
+import {
+  getSignedAgreementAccessCookieName,
+  parseSignedAgreementAccessToken,
+} from "@/lib/signing/access-token";
+import {
+  ensureAgreementResponseForAccess,
+  normalizeSignerEmail,
+  normalizeSignerName,
+} from "@/lib/signing/agreements";
 import { recordLinkView } from "@/lib/tracking/record-link-view";
 import { CustomUser, WatermarkConfigSchema } from "@/lib/types";
 import { checkPassword, decryptEncrpytedPassword, log } from "@/lib/utils";
@@ -33,27 +51,34 @@ export async function POST(request: NextRequest) {
     // POST /api/views
     const {
       linkId,
-      documentId,
       userId,
       documentVersionId,
       documentName,
       hasPages,
       ownerId,
+      startPage,
       ...data
     } = body as {
       linkId: string;
-      documentId: string;
       userId: string | null;
       documentVersionId: string;
       documentName: string;
       hasPages: boolean;
       ownerId: string;
+      startPage?: number;
     };
 
-    const { email, password, name, hasConfirmedAgreement } = data as {
+    const {
+      email,
+      password,
+      name,
+      agreementResponseId,
+      hasConfirmedAgreement,
+    } = data as {
       email: string;
       password: string;
       name?: string;
+      agreementResponseId?: string;
       hasConfirmedAgreement?: boolean;
     };
 
@@ -94,11 +119,20 @@ export async function POST(request: NextRequest) {
         password: true,
         domainSlug: true,
         isArchived: true,
+        deletedAt: true,
         slug: true,
         allowList: true,
         denyList: true,
         enableAgreement: true,
         agreementId: true,
+        agreement: {
+          select: {
+            id: true,
+            signingProvider: true,
+            contentType: true,
+            requireName: true,
+          },
+        },
         enableWatermark: true,
         watermarkConfig: true,
         teamId: true,
@@ -106,12 +140,28 @@ export async function POST(request: NextRequest) {
           select: {
             plan: true,
             globalBlockList: true,
+            agentsEnabled: true,
+            pauseStartsAt: true,
           },
         },
         customFields: {
           select: {
             identifier: true,
             label: true,
+          },
+        },
+        document: {
+          select: {
+            agentsEnabled: true,
+          },
+        },
+        visitorGroups: {
+          select: {
+            visitorGroup: {
+              select: {
+                emails: true,
+              },
+            },
           },
         },
       },
@@ -129,6 +179,48 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       );
     }
+
+    if (link.deletedAt) {
+      return NextResponse.json(
+        { message: "Link has been deleted." },
+        { status: 404 },
+      );
+    }
+
+    if (!link.documentId) {
+      return NextResponse.json(
+        { message: "Unauthorized access." },
+        { status: 403 },
+      );
+    }
+
+    if (!documentVersionId || typeof documentVersionId !== "string") {
+      return NextResponse.json(
+        { message: "documentVersionId is required." },
+        { status: 400 },
+      );
+    }
+
+    const requestedVersion = await prisma.documentVersion.findUnique({
+      where: { id: documentVersionId },
+      select: { documentId: true },
+    });
+
+    if (!requestedVersion) {
+      return NextResponse.json(
+        { message: "Document version not found." },
+        { status: 404 },
+      );
+    }
+
+    if (requestedVersion.documentId !== link.documentId) {
+      return NextResponse.json(
+        { message: "Unauthorized access." },
+        { status: 403 },
+      );
+    }
+
+    const documentId = link.documentId;
 
     let isEmailVerified: boolean = false;
     let hashedVerificationToken: string | null = null;
@@ -160,10 +252,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let effectiveEmail = normalizeSignerEmail(email);
+    let effectiveName = normalizeSignerName(name);
+
+    const signedAccessCookieValue =
+      link.enableAgreement && link.agreement
+        ? request.cookies.get(getSignedAgreementAccessCookieName(linkId))?.value
+        : undefined;
+    const signedAccessPayload = parseSignedAgreementAccessToken(
+      signedAccessCookieValue,
+    );
+    const cookieAgreementResponseId =
+      link.enableAgreement &&
+      link.agreement &&
+      signedAccessPayload &&
+      signedAccessPayload.linkId === linkId &&
+      signedAccessPayload.agreementId === link.agreement.id
+        ? signedAccessPayload.agreementResponseId
+        : null;
+
+    let verifiedAgreementResponse: Awaited<
+      ReturnType<typeof ensureAgreementResponseForAccess>
+    > | null = null;
+
     if (!isTeamMember) {
+      if (cookieAgreementResponseId && link.enableAgreement && link.agreement) {
+        try {
+          verifiedAgreementResponse = await ensureAgreementResponseForAccess({
+            agreement: link.agreement,
+            linkId,
+            agreementResponseId: cookieAgreementResponseId,
+            skipSignerIdentityCheck: true,
+          });
+          effectiveEmail =
+            normalizeSignerEmail(verifiedAgreementResponse.signerEmail) ??
+            effectiveEmail;
+          effectiveName =
+            normalizeSignerName(verifiedAgreementResponse.signerName) ??
+            effectiveName;
+        } catch {
+          // Continue with the submitted identity; the agreement gate below will fail closed if needed.
+        }
+      }
+
       // Check if email is required for visiting the link
       if (link.emailProtected) {
-        if (!email || email.trim() === "") {
+        if (!effectiveEmail || effectiveEmail.trim() === "") {
           return NextResponse.json(
             { message: "Email is required." },
             { status: 400 },
@@ -171,7 +305,7 @@ export async function POST(request: NextRequest) {
         }
 
         // validate email
-        if (!validateEmail(email)) {
+        if (!validateEmail(effectiveEmail)) {
           return NextResponse.json(
             { message: "Invalid email address." },
             { status: 400 },
@@ -205,17 +339,59 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Check if agreement is required for visiting the link
-      if (link.enableAgreement && !hasConfirmedAgreement) {
+      if (link.enableAgreement && !link.agreement) {
         return NextResponse.json(
-          { message: "Agreement to NDA is required." },
-          { status: 400 },
+          { message: "Agreement is required but not configured." },
+          { status: 500 },
         );
+      }
+
+      if (
+        link.enableAgreement &&
+        link.agreement &&
+        !verifiedAgreementResponse
+      ) {
+        const resolvedAgreementResponseId =
+          agreementResponseId ?? cookieAgreementResponseId ?? undefined;
+
+        const hasCookieIdentityProof =
+          !!cookieAgreementResponseId &&
+          (!agreementResponseId ||
+            agreementResponseId === cookieAgreementResponseId);
+
+        try {
+          verifiedAgreementResponse = await ensureAgreementResponseForAccess({
+            agreement: link.agreement,
+            linkId,
+            agreementResponseId: resolvedAgreementResponseId,
+            hasConfirmedAgreement,
+            signerEmail: effectiveEmail,
+            signerName: effectiveName,
+            requireSignerEmail: link.emailProtected,
+            skipSignerIdentityCheck: hasCookieIdentityProof,
+          });
+          effectiveEmail =
+            normalizeSignerEmail(verifiedAgreementResponse.signerEmail) ??
+            effectiveEmail;
+          effectiveName =
+            normalizeSignerName(verifiedAgreementResponse.signerName) ??
+            effectiveName;
+        } catch (error) {
+          return NextResponse.json(
+            {
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Agreement signing is required.",
+            },
+            { status: 400 },
+          );
+        }
       }
 
       // Check global block list first - this overrides all other access controls
       const globalBlockCheck = checkGlobalBlockList(
-        email,
+        effectiveEmail ?? undefined,
         link.team?.globalBlockList,
       );
       if (globalBlockCheck.error) {
@@ -225,21 +401,33 @@ export async function POST(request: NextRequest) {
         );
       }
       if (globalBlockCheck.isBlocked) {
-        waitUntil(reportDeniedAccessAttempt(link, email, "global"));
+        waitUntil(
+          reportDeniedAccessAttempt(link, effectiveEmail ?? "", "global"),
+        );
 
         return NextResponse.json({ message: "Access denied" }, { status: 403 });
       }
 
+      // Build combined allow list from individual emails + visitor groups
+      const visitorGroupEmails =
+        link.visitorGroups?.flatMap((vg) => vg.visitorGroup.emails) || [];
+      const combinedAllowList = [
+        ...(link.allowList || []),
+        ...visitorGroupEmails,
+      ];
+
       // Check if email is allowed to visit the link
-      if (link.allowList && link.allowList.length > 0) {
+      if (combinedAllowList.length > 0) {
         // Determine if the email or its domain is allowed
-        const isAllowed = link.allowList.some((allowed) =>
-          isEmailMatched(email, allowed),
+        const isAllowed = combinedAllowList.some((allowed) =>
+          isEmailMatched(effectiveEmail ?? "", allowed),
         );
 
         // Deny access if the email is not allowed
         if (!isAllowed) {
-          waitUntil(reportDeniedAccessAttempt(link, email, "allow"));
+          waitUntil(
+            reportDeniedAccessAttempt(link, effectiveEmail ?? "", "allow"),
+          );
 
           return NextResponse.json(
             { message: "Unauthorized access" },
@@ -252,12 +440,14 @@ export async function POST(request: NextRequest) {
       if (link.denyList && link.denyList.length > 0) {
         // Determine if the email or its domain is denied
         const isDenied = link.denyList.some((denied) =>
-          isEmailMatched(email, denied),
+          isEmailMatched(effectiveEmail ?? "", denied),
         );
 
         // Deny access if the email is denied
         if (isDenied) {
-          waitUntil(reportDeniedAccessAttempt(link, email, "deny"));
+          waitUntil(
+            reportDeniedAccessAttempt(link, effectiveEmail ?? "", "deny"),
+          );
 
           return NextResponse.json(
             { message: "Unauthorized access" },
@@ -272,6 +462,21 @@ export async function POST(request: NextRequest) {
       if (link.emailAuthenticated && !code && !token) {
         const ipAddressValue = ipAddress(request);
 
+        // Rate limit per email/link combination (1 per 30 seconds) to prevent OTP flooding
+        const { success: emailLimitSuccess } = await ratelimit(1, "30 s").limit(
+          `send-otp:${linkId}:${effectiveEmail}`,
+        );
+        if (!emailLimitSuccess) {
+          return NextResponse.json(
+            {
+              message:
+                "Please wait before requesting another code. Try again in 30 seconds.",
+            },
+            { status: 429 },
+          );
+        }
+
+        // Additional IP-based rate limit (10 per minute) to prevent abuse across different emails
         const { success } = await ratelimit(10, "1 m").limit(
           `send-otp:${ipAddressValue}`,
         );
@@ -284,7 +489,7 @@ export async function POST(request: NextRequest) {
 
         await prisma.verificationToken.deleteMany({
           where: {
-            identifier: `otp:${linkId}:${email}`,
+            identifier: `otp:${linkId}:${effectiveEmail}`,
           },
         });
 
@@ -295,13 +500,18 @@ export async function POST(request: NextRequest) {
         await prisma.verificationToken.create({
           data: {
             token: otpCode,
-            identifier: `otp:${linkId}:${email}`,
+            identifier: `otp:${linkId}:${effectiveEmail}`,
             expires: expiresAt,
           },
         });
 
         waitUntil(
-          sendOtpVerificationEmail(email, otpCode, false, link.teamId!),
+          sendOtpVerificationEmail(
+            effectiveEmail ?? "",
+            otpCode,
+            false,
+            link.teamId!,
+          ),
         );
         return NextResponse.json({
           type: "email-verification",
@@ -325,7 +535,7 @@ export async function POST(request: NextRequest) {
         const verification = await prisma.verificationToken.findUnique({
           where: {
             token: code,
-            identifier: `otp:${linkId}:${email}`,
+            identifier: `otp:${linkId}:${effectiveEmail}`,
           },
         });
 
@@ -370,7 +580,7 @@ export async function POST(request: NextRequest) {
         await prisma.verificationToken.create({
           data: {
             token: hashedVerificationToken,
-            identifier: `link-verification:${linkId}:${link.teamId}:${email}`,
+            identifier: `link-verification:${linkId}:${link.teamId}:${effectiveEmail}`,
             expires: tokenExpiresAt,
           },
         });
@@ -394,7 +604,7 @@ export async function POST(request: NextRequest) {
         const verification = await prisma.verificationToken.findUnique({
           where: {
             token: token,
-            identifier: `link-verification:${linkId}:${link.teamId}:${email}`,
+            identifier: `link-verification:${linkId}:${link.teamId}:${effectiveEmail}`,
           },
         });
 
@@ -429,6 +639,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (
+      !verifiedAgreementResponse &&
+      cookieAgreementResponseId &&
+      link.enableAgreement &&
+      link.agreement
+    ) {
+      try {
+        verifiedAgreementResponse = await ensureAgreementResponseForAccess({
+          agreement: link.agreement,
+          linkId,
+          agreementResponseId: cookieAgreementResponseId,
+          skipSignerIdentityCheck: true,
+        });
+        effectiveEmail =
+          normalizeSignerEmail(verifiedAgreementResponse.signerEmail) ??
+          effectiveEmail;
+        effectiveName =
+          normalizeSignerName(verifiedAgreementResponse.signerName) ??
+          effectiveName;
+      } catch {
+        // Existing link sessions still grant access; ignore stale signed identity cookies.
+      }
+    }
+
     // Check if there's a valid preview session
     let previewSession: PreviewSession | null = null;
     if (!isPreview && previewToken) {
@@ -459,14 +693,14 @@ export async function POST(request: NextRequest) {
 
     try {
       let viewer: { id: string; verified: boolean } | null = null;
-      if (email && !isPreview) {
+      if (effectiveEmail && !isPreview) {
         // find or create a viewer
         console.time("find-viewer");
         viewer = await prisma.viewer.findUnique({
           where: {
             teamId_email: {
               teamId: link.teamId!,
-              email: email,
+              email: effectiveEmail,
             },
           },
           select: { id: true, verified: true },
@@ -477,7 +711,7 @@ export async function POST(request: NextRequest) {
           console.time("create-viewer");
           viewer = await prisma.viewer.create({
             data: {
-              email: email,
+              email: effectiveEmail,
               verified: isEmailVerified,
               teamId: link.teamId!,
             },
@@ -498,21 +732,12 @@ export async function POST(request: NextRequest) {
         newView = await prisma.view.create({
           data: {
             linkId: linkId,
-            viewerEmail: email,
-            viewerName: name,
+            viewerEmail: effectiveEmail,
+            viewerName: effectiveName,
             documentId: documentId,
             teamId: link.teamId!,
             viewerId: viewer?.id ?? undefined,
             verified: isEmailVerified,
-            ...(link.enableAgreement &&
-              link.agreementId &&
-              hasConfirmedAgreement && {
-                agreementResponse: {
-                  create: {
-                    agreementId: link.agreementId,
-                  },
-                },
-              }),
             ...(customFields &&
               link.customFields.length > 0 && {
                 customFieldResponse: {
@@ -528,6 +753,17 @@ export async function POST(request: NextRequest) {
           },
           select: { id: true },
         });
+
+        if (verifiedAgreementResponse) {
+          await prisma.agreementResponse.update({
+            where: {
+              id: verifiedAgreementResponse.id,
+            },
+            data: {
+              viewId: newView.id,
+            },
+          });
+        }
         console.timeEnd("create-view");
       }
 
@@ -535,6 +771,7 @@ export async function POST(request: NextRequest) {
       // otherwise, return file from document version
       let documentPages, documentVersion;
       let sheetData;
+      const INITIAL_PAGES_TO_LOAD = 10;
       // let documentPagesPromise, documentVersionPromise;
       if (hasPages) {
         const featureFlags = await getFeatureFlags({
@@ -558,12 +795,28 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Sign URLs for pages around the requested start page (or page 1 by default).
+        // Remaining page URLs are fetched on-demand by the client via /api/views/pages.
+        const centerIndex = Math.min(
+          Math.max(0, (startPage ?? 1) - 1),
+          Math.max(0, documentPages.length - 1),
+        );
+        const halfWindow = Math.floor(INITIAL_PAGES_TO_LOAD / 2);
+        const signStart = Math.max(0, centerIndex - halfWindow);
+        const signEnd = Math.min(
+          documentPages.length,
+          signStart + INITIAL_PAGES_TO_LOAD,
+        );
+
         documentPages = await Promise.all(
-          documentPages.map(async (page) => {
+          documentPages.map(async (page, index) => {
             const { storageType, ...otherPage } = page;
             return {
               ...otherPage,
-              file: await getFile({ data: page.file, type: storageType }),
+              file:
+                index >= signStart && index < signEnd
+                  ? await getFile({ data: page.file, type: storageType })
+                  : null,
             };
           }),
         );
@@ -621,6 +874,11 @@ export async function POST(request: NextRequest) {
         console.timeEnd("get-file");
       }
 
+      const isPaused =
+        link.team?.pauseStartsAt && link.team?.pauseStartsAt <= new Date()
+          ? true
+          : false;
+
       if (newView) {
         // Record view in the background to avoid blocking the response
         waitUntil(
@@ -633,20 +891,46 @@ export async function POST(request: NextRequest) {
             documentId,
             teamId: link.teamId!,
             enableNotification: link.enableNotification,
+            isPaused,
           }),
         );
+        if (!isPreview) {
+          waitUntil(
+            notifyDocumentView({
+              teamId: link.teamId!,
+              documentId,
+              linkId,
+              viewerEmail: effectiveEmail ?? undefined,
+              viewerId: viewer?.id ?? undefined,
+              teamIsPaused: isPaused,
+            }).catch((error) => {
+              console.error("Error sending Slack notification:", error);
+            }),
+          );
+        }
       }
+
+      // Determine if AI agents should be enabled (requires both team and document level)
+      const agentsEnabled =
+        link.team?.agentsEnabled && link.document?.agentsEnabled;
+
+      const isLinkType = documentVersion?.type === "link";
+      const isEmbeddable = isLinkType
+        ? await isEmbeddableUrl(documentVersion?.file)
+        : false;
 
       const returnObject = {
         message: "View recorded",
         viewId: !isPreview && newView ? newView.id : undefined,
+        viewerId: viewer?.id ?? undefined,
         isPreview: isPreview ? true : undefined,
         file:
           (documentVersion &&
             (documentVersion.type === "pdf" ||
               documentVersion.type === "image" ||
               documentVersion.type === "zip" ||
-              documentVersion.type === "video")) ||
+              documentVersion.type === "video" ||
+              documentVersion.type === "link")) ||
           (documentVersion && useAdvancedExcelViewer)
             ? documentVersion.file
             : undefined,
@@ -677,9 +961,42 @@ export async function POST(request: NextRequest) {
             : undefined,
         verificationToken: hashedVerificationToken ?? undefined,
         ...(isTeamMember && { isTeamMember: true }),
+        ...(agentsEnabled && { agentsEnabled: true }),
+        ...(isEmbeddable && { isEmbeddable: true }),
       };
 
-      return NextResponse.json(returnObject);
+      const response = NextResponse.json(returnObject);
+
+      if (!isPreview && newView) {
+        const ipAddressValue = ipAddress(request) ?? LOCALHOST_IP;
+        const userAgent = request.headers.get("user-agent") ?? "unknown";
+        const fingerprint = generateSessionFingerprint(
+          collectFingerprintHeaders(request.headers),
+        );
+        const { token: sessionToken, expiresAt } = await createLinkSession(
+          linkId,
+          "DOCUMENT_LINK",
+          newView.id,
+          effectiveEmail ?? "",
+          ipAddressValue,
+          userAgent,
+          isEmailVerified,
+          viewer?.id ?? undefined,
+          documentId,
+          undefined,
+          fingerprint,
+        );
+
+        response.cookies.set(getLinkSessionCookieName(linkId), sessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          expires: new Date(expiresAt),
+          path: "/",
+        });
+      }
+
+      return response;
     } catch (error) {
       log({
         message: `Failed to record view for ${linkId}. \n\n ${error}`,

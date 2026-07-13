@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 
+import { enforceDataroomMemberScope } from "@/lib/api/rbac/guard";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
@@ -25,6 +26,11 @@ export default async function handle(
     };
     const userId = (session.user as CustomUser).id;
 
+    // Scoped members may only read views for their assigned rooms.
+    if (await enforceDataroomMemberScope({ userId, teamId, dataroomId, res })) {
+      return;
+    }
+
     try {
       const team = await prisma.team.findUnique({
         where: {
@@ -37,6 +43,7 @@ export default async function handle(
         },
         select: {
           id: true,
+          pauseStartsAt: true,
         },
       });
 
@@ -56,6 +63,11 @@ export default async function handle(
           views: {
             where: {
               viewType: "DATAROOM_VIEW",
+              ...(team.pauseStartsAt && {
+                viewedAt: {
+                  lt: team.pauseStartsAt,
+                },
+              }),
             },
             orderBy: {
               viewedAt: "desc",
@@ -70,9 +82,14 @@ export default async function handle(
                 select: {
                   id: true,
                   agreementId: true,
+                  signingStatus: true,
+                  signedAt: true,
+                  completedAt: true,
                   agreement: {
                     select: {
                       name: true,
+                      contentType: true,
+                      signingProvider: true,
                     },
                   },
                 },
@@ -95,6 +112,19 @@ export default async function handle(
         },
       });
 
+      // Calculate hidden views due to pause (views after pause date)
+      const hiddenViewsFromPause = team.pauseStartsAt
+        ? await prisma.view.count({
+            where: {
+              dataroomId: dataroomId,
+              viewType: "DATAROOM_VIEW",
+              viewedAt: {
+                gte: team.pauseStartsAt,
+              },
+            },
+          })
+        : 0;
+
       const views = dataroom?.views || [];
 
       const returnViews = views.map((view) => {
@@ -105,7 +135,10 @@ export default async function handle(
         };
       });
 
-      return res.status(200).json(returnViews);
+      return res.status(200).json({
+        views: returnViews,
+        hiddenFromPause: hiddenViewsFromPause,
+      });
     } catch (error) {
       log({
         message: `Failed to get views for dataroom: _${dataroomId}_. \n\n ${error} \n\n*Metadata*: \`{teamId: ${teamId}, userId: ${userId}}\``,

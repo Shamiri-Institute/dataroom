@@ -61,6 +61,8 @@ type DataroomDocumentWithVersion = {
   folderId: string | null;
   id: string;
   name: string;
+  orderIndex: number | null;
+  hierarchicalIndex: string | null;
   versions: {
     id: string;
     versionNumber: number;
@@ -75,6 +77,8 @@ type DataroomFolderWithDocumentsNew = DataroomFolder & {
     folderId: string | null;
     id: string;
     name: string;
+    orderIndex: number | null;
+    hierarchicalIndex: string | null;
   }[];
 };
 

@@ -12,6 +12,54 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
+  if (req.method === "GET") {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session) {
+      return res.status(401).end("Unauthorized");
+    }
+
+    const { teamId, id: dataroomId } = req.query as {
+      teamId: string;
+      id: string;
+    };
+    const userId = (session.user as CustomUser).id;
+
+    try {
+      // Verify team access
+      const team = await prisma.team.findUnique({
+        where: {
+          id: teamId,
+          users: {
+            some: {
+              userId: userId,
+            },
+          },
+        },
+        select: { plan: true },
+      });
+
+      if (!team) {
+        return res.status(404).end("Team not found");
+      }
+
+      // Get existing exports for this dataroom
+      const existingExports = await jobStore.getResourceJobs(
+        dataroomId,
+        teamId,
+        "dataroom",
+        undefined,
+        10,
+      );
+
+      return res.status(200).json(existingExports);
+    } catch (error) {
+      console.error("Error fetching existing exports:", error);
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch existing exports" });
+    }
+  }
+
   if (req.method !== "POST") {
     // Changed to POST to trigger background job
     res.setHeader("Allow", ["POST"]);
@@ -79,7 +127,7 @@ export default async function handler(
     });
 
     // Trigger the background task
-    await exportVisitsTask.trigger(
+    const handle = await exportVisitsTask.trigger(
       {
         type: "dataroom",
         teamId,
@@ -93,9 +141,14 @@ export default async function handler(
       },
     );
 
+    // Update the job with the trigger run ID for cancellation
+    const updatedJob = await jobStore.updateJob(exportJob.id, {
+      triggerRunId: handle.id,
+    });
+
     return res.status(200).json({
-      exportId: exportJob.id,
-      status: exportJob.status,
+      exportId: updatedJob?.id || exportJob.id,
+      status: updatedJob?.status || exportJob.status,
       message:
         "Export job created successfully. You will be notified when it's ready.",
     });

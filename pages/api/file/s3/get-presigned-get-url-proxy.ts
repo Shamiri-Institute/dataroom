@@ -3,6 +3,10 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 
+import { errorhandler } from "@/lib/errorHandler";
+import prisma from "@/lib/prisma";
+import { CustomUser } from "@/lib/types";
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -16,10 +20,41 @@ export default async function handler(
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const { key } = req.body as { key: string };
+  const { key, responseContentDisposition } = req.body as {
+    key: string;
+    responseContentDisposition?: string;
+  };
 
   if (!key) {
     return res.status(400).json({ message: "Key is required" });
+  }
+
+  // Extract teamId from key (format: teamId/docId/filename)
+  const teamId = key.split("/")[0];
+  if (!teamId) {
+    return res.status(400).json({ message: "Invalid key format" });
+  }
+
+  // Check if user belongs to the team that owns the file
+  try {
+    const team = await prisma.team.findUnique({
+      where: {
+        id: teamId,
+        users: {
+          some: {
+            userId: (session.user as CustomUser).id,
+          },
+        },
+      },
+    });
+
+    if (!team) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You are not a member of this team" });
+    }
+  } catch (error) {
+    return errorhandler(error, res);
   }
 
   try {
@@ -31,7 +66,10 @@ export default async function handler(
           "Content-Type": "application/json",
           Authorization: `Bearer ${process.env.INTERNAL_API_KEY}`,
         },
-        body: JSON.stringify({ key: key }),
+        body: JSON.stringify({
+          key,
+          ...(responseContentDisposition ? { responseContentDisposition } : {}),
+        }),
       },
     );
 

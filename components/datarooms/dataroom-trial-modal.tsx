@@ -55,6 +55,26 @@ export function DataroomTrialModal({
   const teamInfo = useTeam();
   const analytics = useAnalytics();
 
+  // Helper function to convert industry to proper dataroom name
+  const getDataroomName = (industryValue: string) => {
+    const industryNames: Record<string, string> = {
+      "finance-banking": "Finance and Banking Data Room",
+      legal: "Legal Data Room",
+      "real-estate": "Real Estate Data Room",
+      technology: "Technology Data Room",
+      pharmaceuticals: "Pharmaceuticals Data Room",
+      energy: "Energy Data Room",
+      manufacturing: "Manufacturing Data Room",
+      healthcare: "Healthcare Data Room",
+      consulting: "Consulting and Professional Services Data Room",
+      government: "Government and Public Sector Data Room",
+      entertainment: "Entertainment and Media Data Room",
+      other: "Data Room",
+    };
+
+    return industryNames[industryValue] || "Data Room";
+  };
+
   const handleSubmit = async (event: any) => {
     event.preventDefault();
     event.stopPropagation();
@@ -66,6 +86,8 @@ export function DataroomTrialModal({
 
     setLoading(true);
 
+    const dataroomName = getDataroomName(industry);
+
     try {
       const response = await fetch(
         `/api/teams/${teamInfo?.currentTeam?.id}/datarooms/trial`,
@@ -75,7 +97,7 @@ export function DataroomTrialModal({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: "Dataroom #1",
+            name: dataroomName,
             fullName: name,
             companyName,
             industry,
@@ -93,13 +115,16 @@ export function DataroomTrialModal({
       }
 
       analytics.capture("Dataroom Trial Created", {
-        dataroomName: "Dataroom #1",
+        dataroomName: dataroomName,
         industry,
         companySize,
       });
-      toast.success("Dataroom successfully created! 🎉");
+      toast.success("Free trial started! 🎉");
 
-      await mutate(`/api/teams/${teamInfo?.currentTeam?.id}/datarooms`);
+      await Promise.all([
+        mutate(`/api/teams/${teamInfo?.currentTeam?.id}/datarooms`),
+        mutate(`/api/teams/${teamInfo?.currentTeam?.id}/datarooms?simple=true`),
+      ]);
       router.push("/datarooms");
     } catch (error) {
       setLoading(false);
@@ -126,7 +151,7 @@ export function DataroomTrialModal({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader className="text-start">
-          <DialogTitle>Dataroom Trial for 7 days</DialogTitle>
+          <DialogTitle>Start a 7-day free trial</DialogTitle>
           <DialogDescription>No credit card required.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -240,7 +265,7 @@ export function DataroomTrialModal({
                 <UpgradePlanModal clickedPlan={PlanEnum.Business}>
                   <button className="underline">Papermark Business</button>
                 </UpgradePlanModal>{" "}
-                to continue using data rooms.
+                to continue using advanced data room features.
               </div>
             </div>
           </DialogFooter>

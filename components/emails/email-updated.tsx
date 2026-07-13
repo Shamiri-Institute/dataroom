@@ -9,11 +9,13 @@ import {
   Section,
   Tailwind,
   Text,
-} from "@react-email/components";
+} from "react-email";
+
+import { Footer } from "./shared/footer";
 
 export function EmailUpdated({
-  oldEmail = "name@example.com",
-  newEmail = "name@example.com",
+  oldEmail = "old@example.com",
+  newEmail = "new@example.com",
 }: {
   oldEmail: string;
   newEmail: string;
@@ -47,19 +49,7 @@ export function EmailUpdated({
             <Text className="text-sm leading-6 text-black">
               This message is being sent to your old email address only.
             </Text>
-            <Hr />
-            <Section className="mt-8 text-gray-400">
-              <Text className="text-xs">
-                © {new Date().getFullYear()}{" "}
-                <a
-                  href="https://www.papermark.com"
-                  className="text-gray-400 no-underline hover:text-gray-400"
-                  target="_blank"
-                >
-                  papermark.com
-                </a>
-              </Text>
-            </Section>
+            <Footer />
           </Container>
         </Body>
       </Tailwind>

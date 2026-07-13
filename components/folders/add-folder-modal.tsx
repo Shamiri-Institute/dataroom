@@ -1,14 +1,20 @@
 import { useRouter } from "next/router";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useTeam } from "@/context/team-context";
 import { PlanEnum } from "@/ee/stripe/constants";
-import slugify from "@sindresorhus/slugify";
 import { toast } from "sonner";
 import { mutate } from "swr";
 import { z } from "zod";
 
+import {
+  DEFAULT_FOLDER_COLOR,
+  DEFAULT_FOLDER_ICON,
+  FolderColorId,
+  FolderIconId,
+} from "@/lib/constants/folder-constants";
+import { safeSlugify } from "@/lib/utils";
 import { useAnalytics } from "@/lib/analytics";
 import { usePlan } from "@/lib/swr/use-billing";
 
@@ -26,43 +32,63 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { UpgradePlanModal } from "../billing/upgrade-plan-modal";
+import { FolderIconColorPicker } from "./folder-icon-picker";
 
 export function AddFolderModal({
-  // open,
-  // setOpen,
+  open: openProp,
+  onOpenChange,
   onAddition,
   isDataroom,
   dataroomId,
   children,
 }: {
-  // open?: boolean;
-  // setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Controlled open state. Pair with `onOpenChange` to drive from outside. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onAddition?: (folderName: string) => void;
   isDataroom?: boolean;
   dataroomId?: string;
   children?: React.ReactNode;
 }) {
   const router = useRouter();
+  const folderNameInputRef = useRef<HTMLInputElement>(null);
   const [folderName, setFolderName] = useState<string>("");
+  const [folderIcon, setFolderIcon] = useState<FolderIconId>(DEFAULT_FOLDER_ICON);
+  const [folderColor, setFolderColor] = useState<FolderColorId>(DEFAULT_FOLDER_COLOR);
   const [loading, setLoading] = useState<boolean>(false);
-  const [open, setOpen] = useState<boolean>(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState<boolean>(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
 
   const teamInfo = useTeam();
   const { isFree, isTrial } = usePlan();
   const analytics = useAnalytics();
+
+  // Shamiri: self-hosted deployment — folder creation is never plan-gated.
+  // Upstream gates free (non-trial) plans here: `!(isFree && !isTrial)`.
+  const isCreationAllowed = true;
 
   /** current folder name */
   const currentFolderPath = router.query.name as string[] | undefined;
 
   const folderPath =
     isDataroom && dataroomId
-      ? `/datarooms/${dataroomId}/documents/${currentFolderPath ? currentFolderPath?.join("/") : ""}/${"/" + slugify(folderName.trim())}`
-      : `/documents/tree/${currentFolderPath ? currentFolderPath?.join("/") : ""}${"/" + slugify(folderName.trim())}`;
+      ? `/datarooms/${dataroomId}/documents/${currentFolderPath ? currentFolderPath?.join("/") : ""}/${"/" + safeSlugify(folderName.trim())}`
+      : `/documents/tree/${currentFolderPath ? currentFolderPath?.join("/") : ""}${"/" + safeSlugify(folderName.trim())}`;
 
   const addFolderSchema = z.object({
-    name: z.string().min(3, {
-      message: "Please provide a folder name with at least 3 characters.",
-    }),
+    name: z
+      .string()
+      .min(3, {
+        message: "Please provide a folder name with at least 3 characters.",
+      })
+      .max(256, {
+        message: "Folder name must be 256 characters or less.",
+      }),
   });
 
   const validation = addFolderSchema.safeParse({ name: folderName });
@@ -70,6 +96,13 @@ export function AddFolderModal({
   const handleSubmit = async (event: any) => {
     event.preventDefault();
     event.stopPropagation();
+
+    // Defense in depth: the form isn't rendered when creation is blocked,
+    // but guard the creation path so a stale/leaked submission can't slip past.
+    if (!isCreationAllowed) {
+      setOpen(false);
+      return;
+    }
 
     if (!validation.success) {
       toast.error(validation.error.errors[0].message);
@@ -91,6 +124,8 @@ export function AddFolderModal({
           body: JSON.stringify({
             name: folderName.trim(),
             path: currentFolderPath?.join("/"),
+            icon: folderIcon,
+            color: folderColor,
           }),
         },
       );
@@ -106,6 +141,8 @@ export function AddFolderModal({
 
       analytics.capture("Folder Added", {
         folderName: folderName.trim(),
+        icon: folderIcon,
+        color: folderColor,
         dataroomId,
       });
       toast.success(`Folder added successfully!`, {
@@ -130,37 +167,64 @@ export function AddFolderModal({
       return;
     } finally {
       setFolderName("");
+      setFolderIcon(DEFAULT_FOLDER_ICON);
+      setFolderColor(DEFAULT_FOLDER_COLOR);
       setLoading(false);
       setOpen(false);
     }
   };
 
+  // Shamiri: plan gating removed — never swap in the upgrade modal.
+  // Upstream renders <UpgradePlanModal clickedPlan={PlanEnum.Pro} .../> here
+  // when `!isCreationAllowed`, for both trigger-child and controlled usage.
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
+      <DialogContent
+        className="sm:max-w-[425px]"
+        onOpenAutoFocus={(e) => {
+          // Override Radix's default focus (which lands on the icon picker
+          // button) so the user can start typing the folder name immediately.
+          e.preventDefault();
+          folderNameInputRef.current?.focus();
+        }}
+      >
         <DialogHeader className="text-start">
           <DialogTitle>Add Folder</DialogTitle>
-          <DialogDescription>You can easily add a folder.</DialogDescription>
+          <DialogDescription>
+            Create a new folder with a custom icon and color.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Label htmlFor="folder-name" className="opacity-80">
             Folder Name
           </Label>
-          <Input
-            id="folder-name"
-            placeholder="folder-123"
-            className="mb-4 mt-1 w-full"
-            onChange={(e) => setFolderName(e.target.value)}
-          />
+          <div className="mb-4 mt-1 flex items-center gap-2">
+            <FolderIconColorPicker
+              iconValue={folderIcon}
+              colorValue={folderColor}
+              onIconChange={setFolderIcon}
+              onColorChange={setFolderColor}
+            />
+            <Input
+              ref={folderNameInputRef}
+              id="folder-name"
+              placeholder="Choose a helpful name"
+              className="flex-1"
+              autoFocus
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+            />
+          </div>
           <DialogFooter>
             <Button
               type="submit"
               className="h-9 w-full"
-              disabled={!validation.success}
+              disabled={!validation.success || !isCreationAllowed}
               loading={loading}
             >
-              Add new folder
+              Create
             </Button>
           </DialogFooter>
         </form>

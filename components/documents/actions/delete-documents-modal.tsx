@@ -75,9 +75,7 @@ function DeleteItemsModal({
           ).then(async (res) => {
             if (!res.ok) {
               const error = await res.json();
-              throw new Error(
-                `Failed to delete document ${documentId}: ${error.message}`,
-              );
+              throw new Error(error.message || "Failed to delete document");
             }
             analytics.capture("Document Deleted", {
               team: teamInfo?.currentTeam?.id,
@@ -96,9 +94,7 @@ function DeleteItemsModal({
           ).then(async (res) => {
             if (!res.ok) {
               const error = await res.json();
-              throw new Error(
-                `Failed to delete folder ${folderId}: ${error.message}`,
-              );
+              throw new Error(error.message || "Failed to delete folder");
             }
             analytics.capture("Folder Deleted", {
               team: teamInfo?.currentTeam?.id,
@@ -143,7 +139,7 @@ function DeleteItemsModal({
           await mutate(
             `/api/teams/${
               teamInfo?.currentTeam?.id
-            }/folders/documents/${folderPathName.join("/")}`,
+            }/folder-documents/${folderPathName.join("/")}`,
           );
         } else {
           const { search, sort, page, limit } = router.query;

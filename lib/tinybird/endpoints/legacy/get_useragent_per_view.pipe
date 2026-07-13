@@ -1,0 +1,25 @@
+VERSION 2
+
+DESCRIPTION >
+  Shamiri: legacy user-agent lookup. The app calls get_useragent_per_view__v2
+  as a fallback when __v3 (pm_click_events) has no rows for a view. The
+  original v2 definition was lost with the old workspace; this reads the same
+  fields from page_views__v3 so the fallback returns rows (or cleanly zero)
+  instead of a 404 that breaks visit exports.
+
+NODE endpoint
+SQL >
+    %
+    SELECT
+        country,
+        city,
+        browser,
+        os,
+        device
+    FROM
+        page_views__v3
+    WHERE
+        documentId = {{ String(documentId, required=True) }}
+        AND viewId = {{ String(viewId, required=True) }}
+        AND time >= {{ Int64(since, required=True) }}
+    LIMIT 1

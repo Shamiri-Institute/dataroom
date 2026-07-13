@@ -1,11 +1,10 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
-import { Link } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
+import { enforceDataroomMemberScope } from "@/lib/api/rbac/guard";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { getTeamWithUsersAndDocument } from "@/lib/team/helper";
 import { CustomUser, LinkWithViews } from "@/lib/types";
 import { decryptEncrpytedPassword, log } from "@/lib/utils";
 
@@ -29,6 +28,11 @@ export default async function handle(
 
     const userId = (session.user as CustomUser).id;
 
+    // Scoped members may only read links for their assigned rooms.
+    if (await enforceDataroomMemberScope({ userId, teamId, dataroomId, res })) {
+      return;
+    }
+
     try {
       // Check if the user is part of the team
       const team = await prisma.team.findUnique({
@@ -51,6 +55,7 @@ export default async function handle(
           dataroomId,
           linkType: "DATAROOM_LINK",
           teamId: teamId,
+          deletedAt: null, // exclude deleted links
         },
         orderBy: {
           createdAt: "desc",
@@ -63,8 +68,12 @@ export default async function handle(
             orderBy: {
               viewedAt: "desc",
             },
+            take: 1,
           },
           customFields: true,
+          visitorGroups: {
+            select: { visitorGroupId: true },
+          },
           _count: {
             select: { views: { where: { viewType: "DATAROOM_VIEW" } } },
           },
@@ -80,16 +89,27 @@ export default async function handle(
             if (link.password !== null) {
               link.password = decryptEncrpytedPassword(link.password);
             }
-            if (link.enableUpload && link.uploadFolderId !== null) {
-              const folder = await prisma.dataroomFolder.findUnique({
-                where: {
-                  id: link.uploadFolderId,
-                },
-                select: {
-                  name: true,
-                },
-              });
-              link.uploadFolderName = folder?.name;
+            if (link.enableUpload) {
+              const allowedIds = Array.isArray(link.uploadFolderIds)
+                ? link.uploadFolderIds.filter(
+                    (id): id is string => typeof id === "string" && !!id,
+                  )
+                : [];
+
+              if (allowedIds.length > 0) {
+                const folders = await prisma.dataroomFolder.findMany({
+                  where: {
+                    id: { in: allowedIds },
+                    dataroomId,
+                  },
+                  select: { id: true, name: true, path: true },
+                });
+                // Preserve the admin-selected order when possible.
+                const byId = new Map(folders.map((f) => [f.id, f]));
+                link.uploadFolders = allowedIds
+                  .map((id) => byId.get(id))
+                  .filter((f): f is (typeof folders)[number] => !!f);
+              }
             }
             const tags = await prisma.tag.findMany({
               where: {

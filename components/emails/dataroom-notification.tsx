@@ -11,18 +11,18 @@ import {
   Section,
   Tailwind,
   Text,
-} from "@react-email/components";
+} from "react-email";
 
 export default function DataroomNotification({
-  dataroomName,
-  documentName,
+  dataroomName = "Example Data Room",
+  documentName = "Example Document",
   senderEmail,
-  url,
-  unsubscribeUrl,
+  url = "https://app.papermark.com/datarooms/123",
+  unsubscribeUrl = "https://app.papermark.com/datarooms/123/unsubscribe",
 }: {
   dataroomName: string;
   documentName: string | undefined;
-  senderEmail: string;
+  senderEmail: string | null;
   url: string;
   unsubscribeUrl: string;
 }) {
@@ -33,10 +33,10 @@ export default function DataroomNotification({
       <Tailwind>
         <Body className="mx-auto my-auto bg-white font-sans">
           <Container className="mx-auto my-10 w-[465px] p-5">
-            <Text className="mx-0 mb-8 mt-4 p-0 text-center text-2xl font-normal">
+            <Text className="mb-8 mt-4 text-center text-2xl font-normal">
               <span className="font-bold tracking-tighter">Papermark</span>
             </Text>
-            <Text className="font-seminbold mx-0 mb-8 mt-4 p-0 text-center text-xl">
+            <Text className="mb-8 mt-4 text-center text-xl">
               {`New document available for ${dataroomName}`}
             </Text>
             <Text className="text-sm leading-6 text-black">
@@ -45,7 +45,7 @@ export default function DataroomNotification({
               added to <span className="font-semibold">{dataroomName}</span>{" "}
               dataroom on Papermark.
             </Text>
-            <Section className="mb-[32px] mt-[32px] text-center">
+            <Section className="my-8 text-center">
               <Button
                 className="rounded bg-black text-center text-xs font-semibold text-white no-underline"
                 href={`${url}`}
@@ -59,31 +59,30 @@ export default function DataroomNotification({
               {`${url}`}
             </Text>
             <Text className="text-sm text-gray-400">Papermark</Text>
+
             <Hr />
-            <Section className="mt-8 text-gray-400">
+            <Section className="text-gray-400">
               <Text className="text-xs">
-                © {new Date().getFullYear()}{" "}
-                <a
-                  href="https://www.papermark.com"
-                  className="text-gray-400 no-underline hover:text-gray-400"
-                  target="_blank"
-                >
-                  papermark.com
-                </a>
+                © {new Date().getFullYear()} Papermark, Inc. All rights
+                reserved.
               </Text>
               <Text className="text-xs">
-                You received this email from{" "}
-                <span className="font-semibold">{senderEmail}</span> because you
-                viewed the dataroom{" "}
+                You received this email{" "}
+                {senderEmail ? (
+                  <>
+                    from{" "}
+                    <span className="font-semibold">{senderEmail}</span>{" "}
+                  </>
+                ) : null}
+                because you viewed the dataroom{" "}
                 <span className="font-semibold">{dataroomName}</span> on
                 Papermark. If you have any feedback or questions about this
-                email, simply reply to it. To unsubscribe from updates about
-                this dataroom,{" "}
+                email, simply reply to it.{" "}
                 <a
                   href={unsubscribeUrl}
-                  className="text-gray-400 underline underline-offset-2 hover:text-gray-400"
+                  className="text-gray-400 underline underline-offset-2"
                 >
-                  click here
+                  Manage your notification preferences
                 </a>
                 .
               </Text>

@@ -9,13 +9,14 @@ import { useAnalytics } from "@/lib/analytics";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import DataroomView from "@/components/view/dataroom/dataroom-view";
 import DocumentView from "@/components/view/document-view";
+import { ViewerI18nProvider } from "@/components/view/viewer-i18n-provider";
 
 import { ViewPageProps } from "./index";
 
 // Reuse the same getStaticProps and getStaticPaths from the main view page
 export { getStaticProps, getStaticPaths } from "./index";
 
-export default function EmbedPage(props: ViewPageProps) {
+function EmbedPageInner(props: ViewPageProps) {
   const router = useRouter();
   const [isEmbedded, setIsEmbedded] = useState<boolean | null>(null);
   const analytics = useAnalytics();
@@ -71,10 +72,11 @@ export default function EmbedPage(props: ViewPageProps) {
     d: string;
     previewToken?: string;
   };
-  const { linkType, link, brand } = props.linkData;
+  const { linkType, brand } = props.linkData;
 
   // Render the document view for DOCUMENT_LINK
   if (linkType === "DOCUMENT_LINK") {
+    const { link } = props.linkData;
     if (!props.linkData || router.isFallback) {
       return (
         <div className="flex h-screen items-center justify-center">
@@ -129,6 +131,7 @@ export default function EmbedPage(props: ViewPageProps) {
 
   // Render the dataroom view for DATAROOM_LINK
   if (linkType === "DATAROOM_LINK") {
+    const { link } = props.linkData;
     if (!link || router.isFallback) {
       return (
         <div className="flex h-screen items-center justify-center">
@@ -176,4 +179,14 @@ export default function EmbedPage(props: ViewPageProps) {
       </div>
     );
   }
+}
+
+export default function EmbedPage(props: ViewPageProps) {
+  const locale = props.i18n?.locale ?? "en";
+  const resources = props.i18n?.resources ?? {};
+  return (
+    <ViewerI18nProvider locale={locale} resources={resources}>
+      <EmbedPageInner {...props} />
+    </ViewerI18nProvider>
+  );
 }

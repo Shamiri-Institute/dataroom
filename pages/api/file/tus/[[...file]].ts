@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
+import { isTeamPausedById } from "@/ee/features/billing/cancellation/lib/is-team-paused";
+import { getLimits } from "@/ee/limits/server";
 import { MultiRegionS3Store } from "@/ee/features/storage/s3-store";
 import { CopyObjectCommand } from "@aws-sdk/client-s3";
-import slugify from "@sindresorhus/slugify";
 import { Server } from "@tus/server";
 import { getServerSession } from "next-auth/next";
 import path from "node:path";
@@ -10,12 +11,19 @@ import path from "node:path";
 import { getTeamS3ClientAndConfig } from "@/lib/files/aws-client";
 import { RedisLocker } from "@/lib/files/tus-redis-locker";
 import { newId } from "@/lib/id-helper";
+import prisma from "@/lib/prisma";
 import { lockerRedisClient } from "@/lib/redis";
-import { log } from "@/lib/utils";
+import { CustomUser } from "@/lib/types";
+import { buildContentDisposition, log, safeSlugify } from "@/lib/utils";
+import {
+  getFileSizeLimit,
+  getFileSizeLimits,
+} from "@/lib/utils/get-file-size-limits";
 
 import { authOptions } from "../../auth/[...nextauth]";
 
 export const config = {
+  maxDuration: 60,
   api: {
     bodyParser: false,
   },
@@ -24,6 +32,15 @@ export const config = {
 const locker = new RedisLocker({
   redisClient: lockerRedisClient,
 });
+
+const FREE_PLAN = "free";
+const FREE_TRIAL_PLAN = "free+drtrial";
+const BYTES_PER_MEGABYTE = 1024 * 1024;
+type TusErrorResponse = { status_code: number; body: string };
+
+type TusAuthenticatedRequest = NextApiRequest & {
+  papermarkUserId?: string;
+};
 
 const tusServer = new Server({
   // `path` needs to match the route declared by the next file router
@@ -39,7 +56,7 @@ const tusServer = new Server({
     };
     const docId = newId("doc");
     const { name, ext } = path.parse(fileName);
-    const newName = `${teamId}/${docId}/${slugify(name)}${ext}`;
+    const newName = `${teamId}/${docId}/${safeSlugify(name)}${ext}`;
     return newName;
   },
   generateUrl(req, { proto, host, path, id }) {
@@ -53,18 +70,187 @@ const tusServer = new Server({
     return Buffer.from(id, "base64url").toString("utf-8");
   },
   onResponseError(req, res, err) {
+    if (typeof err === "object" && err !== null) {
+      const tusError = err as { status_code?: unknown; body?: unknown };
+      if (
+        typeof tusError.status_code === "number" &&
+        typeof tusError.body === "string"
+      ) {
+        return {
+          status_code: tusError.status_code,
+          body: tusError.body,
+        } satisfies TusErrorResponse;
+      }
+    }
+
+    const e = err as
+      | (Error & { cause?: unknown; code?: unknown; $metadata?: unknown })
+      | undefined;
+
+    console.error("[tus] upload error", {
+      url: req.url,
+      method: req.method,
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      cause: e?.cause,
+      awsMetadata: e?.$metadata,
+      stack: e?.stack,
+    });
+
     log({
-      message: "Error uploading a file. Error: \n\n" + err,
+      message:
+        `Error uploading a file. ${e?.name ?? "Unknown"}: ${e?.message ?? String(err)}` +
+        (e?.code ? ` (code: ${String(e.code)})` : "") +
+        (e?.stack ? `\n\n\`\`\`\n${e.stack}\n\`\`\`` : ""),
       type: "error",
     });
     return { status_code: 500, body: "Internal Server Error" };
+  },
+  async onIncomingRequest(req, res, uploadId) {
+    const userId = (req as TusAuthenticatedRequest).papermarkUserId;
+    if (!userId) {
+      throw { status_code: 401, body: "Unauthorized" };
+    }
+
+    // Upload creation is validated in onUploadCreate; here we protect follow-up
+    // requests (HEAD/PATCH/DELETE) so only team members can touch an upload URL.
+    if (!uploadId || req.method === "POST") {
+      return;
+    }
+
+    const decodedUploadId = uploadId.includes("/")
+      ? uploadId
+      : Buffer.from(uploadId, "base64url").toString("utf-8");
+    const uploadTeamId = decodedUploadId.split("/")[0];
+
+    if (!uploadTeamId) {
+      throw { status_code: 400, body: "Invalid upload id" };
+    }
+
+    const hasTeamAccess = await prisma.userTeam.findUnique({
+      where: {
+        userId_teamId: {
+          userId,
+          teamId: uploadTeamId,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    if (!hasTeamAccess) {
+      throw { status_code: 403, body: "Unauthorized to access this team" };
+    }
+  },
+  async onUploadCreate(req, res, upload) {
+    const userId = (req as TusAuthenticatedRequest).papermarkUserId;
+    if (!userId) {
+      throw { status_code: 401, body: "Unauthorized" };
+    }
+
+    const metadata = upload.metadata || {};
+    const teamId = metadata.teamId;
+    const fileName = metadata.fileName;
+    const contentType = metadata.contentType || "application/octet-stream";
+
+    if (!teamId || !fileName) {
+      throw { status_code: 400, body: "Missing required upload metadata" };
+    }
+
+    const team = await prisma.team.findUnique({
+      where: {
+        id: teamId,
+        users: {
+          some: {
+            userId,
+          },
+        },
+      },
+      select: {
+        plan: true,
+      },
+    });
+
+    if (!team) {
+      throw { status_code: 403, body: "Unauthorized to access this team" };
+    }
+
+    const [limits, teamIsPaused] = await Promise.all([
+      getLimits({ teamId, userId }),
+      isTeamPausedById(teamId),
+    ]);
+
+    if (teamIsPaused) {
+      throw {
+        status_code: 403,
+        body: "Team is currently paused. New document uploads are not available.",
+      };
+    }
+
+    // Shamiri: no document count limits
+    // const documentLimit = limits.documents;
+    // if (
+    //   typeof documentLimit === "number" &&
+    //   Number.isFinite(documentLimit) &&
+    //   limits.usage.documents >= documentLimit
+    // ) {
+    //   throw {
+    //     status_code: 403,
+    //     body: "You have reached the team document limit",
+    //   };
+    // }
+
+    const uploadSize = upload.size;
+    if (
+      typeof uploadSize !== "number" ||
+      !Number.isFinite(uploadSize) ||
+      uploadSize <= 0
+    ) {
+      throw { status_code: 400, body: "Missing or invalid upload length" };
+    }
+
+    const isFree = team.plan === FREE_PLAN || team.plan === FREE_TRIAL_PLAN;
+    const isTrial = team.plan.includes("drtrial");
+    const teamFileSizeLimitConfig: Parameters<typeof getFileSizeLimits>[0]["limits"] =
+      "fileSizeLimits" in limits &&
+      typeof limits.fileSizeLimits === "object" &&
+      limits.fileSizeLimits !== null
+        ? {
+            fileSizeLimits: limits.fileSizeLimits as Record<
+              string,
+              number | undefined
+            >,
+          }
+        : undefined;
+    const fileSizeLimits = getFileSizeLimits({
+      limits: teamFileSizeLimitConfig,
+      isFree,
+      isTrial,
+    });
+    const fileSizeLimitMb = getFileSizeLimit(contentType, fileSizeLimits);
+    const fileSizeLimitBytes = fileSizeLimitMb * BYTES_PER_MEGABYTE;
+
+    if (uploadSize > fileSizeLimitBytes) {
+      throw {
+        status_code: 413,
+        body: `File size too big for ${contentType} (max. ${fileSizeLimitMb} MB)`,
+      };
+    }
+
+    return res;
   },
   async onUploadFinish(req, res, upload) {
     try {
       const metadata = upload.metadata || {};
       const contentType = metadata.contentType || "application/octet-stream";
       const { name, ext } = path.parse(metadata.fileName!);
-      const contentDisposition = `attachment; filename="${slugify(name)}${ext}"`;
+      const originalFileName = `${name}${ext}`;
+      const contentDisposition = buildContentDisposition(
+        originalFileName,
+        `${safeSlugify(name)}${ext}`,
+      );
 
       // The Key (object path) where the file was uploaded
       const objectKey = upload.id;
@@ -93,17 +279,52 @@ const tusServer = new Server({
 
       return res;
     } catch (error) {
+      const e = error as
+        | (Error & { code?: unknown; $metadata?: unknown })
+        | undefined;
+      console.error("[tus] onUploadFinish error", {
+        uploadId: upload.id,
+        name: e?.name,
+        message: e?.message,
+        code: e?.code,
+        awsMetadata: e?.$metadata,
+        stack: e?.stack,
+      });
       throw { status_code: 500, body: "Error updating metadata" };
     }
   },
 });
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Get the session
-  const session = getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  try {
+    const session = await getServerSession(req, res, authOptions);
+    const userId = (session?.user as CustomUser | undefined)?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  return tusServer.handle(req, res);
+    (req as TusAuthenticatedRequest).papermarkUserId = userId;
+
+    return await tusServer.handle(req, res);
+  } catch (error) {
+    const e = error as
+      | (Error & { cause?: unknown; code?: unknown; $metadata?: unknown })
+      | undefined;
+    console.error("[tus] handler crash", {
+      url: req.url,
+      method: req.method,
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      cause: e?.cause,
+      awsMetadata: e?.$metadata,
+      stack: e?.stack,
+    });
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  }
 }

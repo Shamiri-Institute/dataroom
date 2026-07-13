@@ -82,24 +82,37 @@ export default async function handle(
       }
 
       const viewersWithStats = (await prisma.$queryRaw`
-        WITH viewer_stats AS (
+        WITH view_stats AS (
           SELECT 
+            vw."viewerId",
+            COUNT(*)::int as total_visits,
+            MAX(vw."viewedAt") as last_viewed
+          FROM "View" vw
+          JOIN "Viewer" vr ON vr.id = vw."viewerId" AND vr."teamId" = ${teamId}
+          WHERE vw."documentId" IS NOT NULL
+          GROUP BY vw."viewerId"
+        ),
+        latest_viewer_names AS (
+          SELECT DISTINCT ON (vw."viewerId")
+            vw."viewerId",
+            vw."viewerName"
+          FROM "View" vw
+          JOIN "Viewer" vr ON vr.id = vw."viewerId" AND vr."teamId" = ${teamId}
+          WHERE vw."viewerName" IS NOT NULL
+          ORDER BY vw."viewerId", vw."viewedAt" DESC
+        ),
+        viewer_stats AS (
+          SELECT
             v.id,
             v.email,
             v."createdAt",
             v."updatedAt",
             COALESCE(vs.total_visits, 0)::int as "totalVisits",
-            vs.last_viewed as "lastViewed"
+            vs.last_viewed as "lastViewed",
+            lvn."viewerName" as "viewerName"
           FROM "Viewer" v
-          LEFT JOIN (
-            SELECT 
-              "viewerId",
-              COUNT(*)::int as total_visits,
-              MAX("viewedAt") as last_viewed
-            FROM "View"
-            WHERE "documentId" IS NOT NULL
-            GROUP BY "viewerId"
-          ) vs ON v.id = vs."viewerId"
+          LEFT JOIN view_stats vs ON v.id = vs."viewerId"
+          LEFT JOIN latest_viewer_names lvn ON v.id = lvn."viewerId"
           WHERE v."teamId" = ${teamId}
             ${searchCondition}
         )
@@ -114,6 +127,7 @@ export default async function handle(
         updatedAt: Date;
         totalVisits: number;
         lastViewed: Date | null;
+        viewerName: string | null;
       }>;
 
       const totalCountResult = (await prisma.$queryRaw`
@@ -133,6 +147,7 @@ export default async function handle(
         updatedAt: viewer.updatedAt,
         totalVisits: viewer.totalVisits,
         lastViewed: viewer.lastViewed,
+        viewerName: viewer.viewerName,
       }));
 
       const response = {

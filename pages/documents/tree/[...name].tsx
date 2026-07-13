@@ -1,16 +1,13 @@
 import { useRouter } from "next/router";
 
 import { useTeam } from "@/context/team-context";
-import { FolderPlusIcon, PlusIcon } from "lucide-react";
+
+import { AddDocumentDropdown } from "@/components/documents/add-document-dropdown";
+import { DocumentsList } from "@/components/documents/documents-list";
+import AppLayout from "@/components/layouts/app";
+import { Separator } from "@/components/ui/separator";
 
 import { useFolder, useFolderDocuments } from "@/lib/swr/use-documents";
-
-import { AddDocumentModal } from "@/components/documents/add-document-modal";
-import { DocumentsList } from "@/components/documents/documents-list";
-import { AddFolderModal } from "@/components/folders/add-folder-modal";
-import AppLayout from "@/components/layouts/app";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 
 export default function DocumentTreePage() {
   const router = useRouter();
@@ -33,25 +30,7 @@ export default function DocumentTreePage() {
             </p>
           </div>
           <div className="flex items-center gap-x-2">
-            <AddDocumentModal>
-              <Button className="gap-x-3 px-3" title="Add Document">
-                <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span>Add Document</span>
-              </Button>
-            </AddDocumentModal>
-            <AddFolderModal>
-              <Button
-                // size="icon"
-                variant="outline"
-                className="gap-x-3 px-3"
-              >
-                <FolderPlusIcon
-                  className="h-5 w-5 shrink-0"
-                  aria-hidden="true"
-                />
-                <span>Add Folder</span>
-              </Button>
-            </AddFolderModal>
+            <AddDocumentDropdown variant="split" />
           </div>
         </section>
 

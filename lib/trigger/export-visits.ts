@@ -54,8 +54,7 @@ export type ExportVisitsPayload = {
 
 export const exportVisitsTask = task({
   id: "export-visits",
-  retry: { maxAttempts: 3 },
-  maxDuration: 900, // 15 minutes to handle large datasets
+  retry: { maxAttempts: 2 },
   run: async (payload: ExportVisitsPayload) => {
     const { type, teamId, resourceId, groupId, userId, exportId } = payload;
 
@@ -181,6 +180,18 @@ export const exportVisitsTask = task({
   },
 });
 
+// Helper function to check if a view occurred during a pause period
+function isViewDuringPause(
+  viewedAt: Date,
+  pauseStartsAt: Date | null,
+  pauseEndsAt: Date | null,
+): boolean {
+  if (!pauseStartsAt || !pauseEndsAt) {
+    return false;
+  }
+  return viewedAt >= pauseStartsAt && viewedAt <= pauseEndsAt;
+}
+
 async function exportDocumentVisits(
   docId: string,
   teamId: string,
@@ -188,7 +199,7 @@ async function exportDocumentVisits(
   csvData: string;
   resourceName: string;
 }> {
-  // Fetch Document
+  // Fetch Document with team pause information
   const document = await prisma.document.findUnique({
     where: { id: docId, teamId: teamId },
     select: {
@@ -206,6 +217,8 @@ async function exportDocumentVisits(
       team: {
         select: {
           plan: true,
+          pauseStartsAt: true,
+          pauseEndsAt: true,
         },
       },
     },
@@ -215,8 +228,10 @@ async function exportDocumentVisits(
     throw new Error("Document not found");
   }
 
+  const { pauseStartsAt, pauseEndsAt } = document.team;
+
   // Fetch views
-  const views = await prisma.view.findMany({
+  const allViews = await prisma.view.findMany({
     where: { documentId: docId },
     include: {
       link: { select: { name: true } },
@@ -241,11 +256,19 @@ async function exportDocumentVisits(
     },
   });
 
+  // Filter out views that occurred during the pause period
+  const views = allViews.filter(
+    (view) => !isViewDuringPause(view.viewedAt, pauseStartsAt, pauseEndsAt),
+  );
+
   if (!views || views.length === 0) {
     throw new Error("Document has no views");
   }
 
   const isProPlan = document.team.plan.includes("pro");
+
+  // Collect all unique custom fields from all views
+  const uniqueCustomFields = collectUniqueCustomFields(views);
 
   // Create CSV rows array starting with headers
   const csvRows: string[] = [];
@@ -254,7 +277,7 @@ async function exportDocumentVisits(
     "Name",
     "Email",
     "Link Name",
-    "Total Visit Duration (s)",
+    "Total View Duration (s)",
     "Total Document Completion (%)",
     "Document version",
     "Downloaded at",
@@ -270,7 +293,9 @@ async function exportDocumentVisits(
   ];
 
   if (!isProPlan) {
-    headers.push("Country", "City", "Custom Fields");
+    headers.push("Country", "City");
+    // Add dynamic custom field headers
+    headers.push(...generateCustomFieldHeaders(uniqueCustomFields));
   }
 
   csvRows.push(createCsvRow(headers));
@@ -355,10 +380,9 @@ async function exportDocumentVisits(
       rowData.push(
         userAgentData?.data[0]?.country || "NaN",
         userAgentData?.data[0]?.city || "NaN",
-        view.customFieldResponse?.data
-          ? JSON.stringify(view.customFieldResponse.data)
-          : "NaN",
       );
+      // Add custom field values for this view
+      rowData.push(...extractCustomFieldValues(view, uniqueCustomFields));
     }
 
     csvRows.push(createCsvRow(rowData));
@@ -370,6 +394,102 @@ async function exportDocumentVisits(
   };
 }
 
+// Helper function to extract all unique custom fields from views
+function collectUniqueCustomFields(
+  views: any[],
+): Array<{ identifier: string; label: string }> {
+  const uniqueFields = new Map<string, string>();
+
+  views.forEach((view, index) => {
+    try {
+      if (
+        view &&
+        view.customFieldResponse?.data &&
+        Array.isArray(view.customFieldResponse.data)
+      ) {
+        view.customFieldResponse.data.forEach((field: any) => {
+          if (field.identifier && field.label) {
+            uniqueFields.set(field.identifier, field.label);
+          }
+        });
+      }
+    } catch (error) {
+      logger.warn(`Error processing custom fields for view ${index}:`, {
+        error: String(error),
+      });
+    }
+  });
+
+  // Sort by identifier for consistent column ordering
+  return Array.from(uniqueFields.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([identifier, label]) => ({ identifier, label }));
+}
+
+// Helper function to generate custom field headers
+function generateCustomFieldHeaders(
+  uniqueFields: Array<{ identifier: string; label: string }>,
+): string[] {
+  const headers: string[] = [];
+  uniqueFields.forEach((field, index) => {
+    headers.push(`Custom Field ${index + 1} Label`);
+    headers.push(`Custom Field ${index + 1} Value`);
+  });
+  return headers;
+}
+
+// Helper function to extract custom field values for a specific view
+function extractCustomFieldValues(
+  view: any,
+  uniqueFields: Array<{ identifier: string; label: string }>,
+): string[] {
+  const values: string[] = [];
+
+  try {
+    // Create a map of the current view's custom field responses
+    const responseMap = new Map<string, { label: string; response: string }>();
+
+    // Check if view exists and has customFieldResponse
+    if (
+      view &&
+      view.customFieldResponse?.data &&
+      Array.isArray(view.customFieldResponse.data)
+    ) {
+      view.customFieldResponse.data.forEach((field: any) => {
+        if (field && field.identifier) {
+          responseMap.set(field.identifier, {
+            label: field.label || "NaN",
+            response: field.response || "NaN",
+          });
+        }
+      });
+    }
+
+    // Fill in values for each unique field in order
+    uniqueFields.forEach((field) => {
+      const response = responseMap.get(field.identifier);
+      if (response) {
+        values.push(response.label);
+        values.push(response.response);
+      } else {
+        values.push("NaN");
+        values.push("NaN");
+      }
+    });
+  } catch (error) {
+    logger.warn(`Error extracting custom field values:`, {
+      error: String(error),
+    });
+    // Fill with NaN values if there's an error
+    uniqueFields.forEach(() => {
+      values.push("NaN");
+      values.push("NaN");
+    });
+  }
+
+  return values;
+}
+
 async function exportDataroomVisits(
   dataroomId: string,
   teamId: string,
@@ -378,7 +498,7 @@ async function exportDataroomVisits(
   csvData: string;
   resourceName: string;
 }> {
-  // Fetch Dataroom
+  // Fetch Dataroom with team pause information
   const dataroom = await prisma.dataroom.findUnique({
     where: { id: dataroomId, teamId: teamId },
     select: {
@@ -403,6 +523,12 @@ async function exportDataroomVisits(
           },
         },
       },
+      team: {
+        select: {
+          pauseStartsAt: true,
+          pauseEndsAt: true,
+        },
+      },
     },
   });
 
@@ -410,8 +536,10 @@ async function exportDataroomVisits(
     throw new Error("Dataroom not found");
   }
 
+  const { pauseStartsAt, pauseEndsAt } = dataroom.team;
+
   // Fetch views
-  const views = await prisma.view.findMany({
+  const allViews = await prisma.view.findMany({
     where: {
       dataroomId: dataroomId,
       ...(groupId && { groupId }),
@@ -454,6 +582,11 @@ async function exportDataroomVisits(
     },
   });
 
+  // Filter out views that occurred during the pause period
+  const views = allViews.filter(
+    (view) => !isViewDuringPause(view.viewedAt, pauseStartsAt, pauseEndsAt),
+  );
+
   if (!views || views.length === 0) {
     throw new Error("Dataroom has no views");
   }
@@ -465,6 +598,9 @@ async function exportDataroomVisits(
   const documentViews = views.filter(
     (view) => view.viewType === "DOCUMENT_VIEW",
   );
+
+  // Collect all unique custom fields from dataroom views
+  const uniqueCustomFields = collectUniqueCustomFields(dataroomViews);
 
   logger.info("Processing dataroom views with rate limiting", {
     dataroomViewCount: dataroomViews.length,
@@ -533,6 +669,7 @@ async function exportDataroomVisits(
     }
 
     exportData.push({
+      dataroomViewId: dataroomView.id, // Add the unique view ID for direct matching
       dataroomViewedAt: dataroomView.viewedAt.toISOString(),
       dataroomDownloadedAt: dataroomView.downloadedAt?.toISOString() || "NaN",
       viewerName: dataroomView.viewerName || "NaN",
@@ -549,60 +686,96 @@ async function exportDataroomVisits(
     });
   }
 
-  // Get user agent data for all document views at once with rate limiting
-  const userAgentDataMap = new Map();
-  for (const docView of documentViews) {
-    const userAgentData = await tinybirdLimiter.schedule(async () => {
-      const result = await getViewUserAgent({
-        viewId: docView.id,
-      });
+  // Create a map for efficient dataroom view lookups by ID
+  const dataroomViewMap = new Map();
+  dataroomViews.forEach((view) => {
+    dataroomViewMap.set(view.id, view);
+  });
 
-      if (!result || result.rows === 0) {
-        return getViewUserAgent_v2({
-          documentId: docView.document?.id || "null",
-          viewId: docView.id,
-          since: 0,
-        });
-      }
+  // Fetch user agent data per dataroom view (stored in pm_click_events via recordLinkView)
+  const userAgentDataMap = new Map<
+    string,
+    { browser: string; os: string; device: string; country: string; city: string }
+  >();
+  for (const drView of dataroomViews) {
+    const userAgentData = await tinybirdLimiter.schedule(() =>
+      getViewUserAgent({ viewId: drView.id }),
+    );
 
-      return result;
-    });
-
-    userAgentDataMap.set(docView.id, userAgentData);
+    if (userAgentData?.data[0]) {
+      userAgentDataMap.set(drView.id, userAgentData.data[0]);
+    }
   }
 
   // Create CSV
   const csvRows: string[] = [];
-  csvRows.push(
-    createCsvRow([
-      "Dataroom Viewed At",
-      "Dataroom Downloaded At",
-      "Visitor Name",
-      "Visitor Email",
-      "Link Name",
-      "Verified",
-      "Agreement Accepted",
-      "Agreement Name",
-      "Agreement Content",
-      "Agreement Accepted At",
-      "Document Name",
-      "Document Viewed At",
-      "Document Downloaded At",
-      "Total Visit Duration (s)",
-      "Total Document Completion (%)",
-      "Document Version",
-      "Browser",
-      "OS",
-      "Device",
-      "Country",
-      "City",
-    ]),
-  );
+  const headers = [
+    "Dataroom Viewed At",
+    "Dataroom Downloaded At",
+    "Visitor Name",
+    "Visitor Email",
+    "Link Name",
+    "Verified",
+    "Agreement Accepted",
+    "Agreement Name",
+    "Agreement Content",
+    "Agreement Accepted At",
+    "Document Name",
+    "Document Viewed At",
+    "Document Downloaded At",
+    "Total Visit Duration (s)",
+    "Total Document Completion (%)",
+    "Document Version",
+    "Browser",
+    "OS",
+    "Device",
+    "Country",
+    "City",
+  ];
+
+  // Add dynamic custom field headers
+  headers.push(...generateCustomFieldHeaders(uniqueCustomFields));
+
+  csvRows.push(createCsvRow(headers));
 
   exportData.forEach((view) => {
+    const ua = userAgentDataMap.get(view.dataroomViewId);
+
     if (view.documentViews.length === 0) {
-      csvRows.push(
-        createCsvRow([
+      const rowData = [
+        view.dataroomViewedAt,
+        view.dataroomDownloadedAt,
+        view.viewerName,
+        view.viewerEmail,
+        view.linkName,
+        view.verified,
+        view.agreementStatus,
+        view.agreementName,
+        view.agreementContent,
+        view.agreementAcceptedAt,
+        "NaN",
+        "NaN",
+        "NaN",
+        "NaN",
+        "NaN",
+        "NaN",
+        ua?.browser || "NaN",
+        ua?.os || "NaN",
+        ua?.device || "NaN",
+        ua?.country || "NaN",
+        ua?.city || "NaN",
+      ];
+
+      // Add custom field values for this dataroom view using direct ID lookup
+      const dataroomView = dataroomViewMap.get(view.dataroomViewId);
+      rowData.push(
+        ...extractCustomFieldValues(dataroomView, uniqueCustomFields),
+      );
+
+      csvRows.push(createCsvRow(rowData));
+    } else {
+      view.documentViews.forEach((docView) => {
+        const rowData = [
           view.dataroomViewedAt,
           view.dataroomDownloadedAt,
           view.viewerName,
@@ -613,48 +786,26 @@ async function exportDataroomVisits(
           view.agreementName,
           view.agreementContent,
           view.agreementAcceptedAt,
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-          "NaN",
-        ]),
-      );
-    } else {
-      view.documentViews.forEach((docView) => {
-        const userAgentData = userAgentDataMap.get(docView.viewId);
+          docView.documentName,
+          docView.viewedAt,
+          docView.downloadedAt,
+          (docView.duration / 1000).toFixed(1),
+          docView.completionRate,
+          docView.documentVersion,
+          ua?.browser || "NaN",
+          ua?.os || "NaN",
+          ua?.device || "NaN",
+          ua?.country || "NaN",
+          ua?.city || "NaN",
+        ];
 
-        csvRows.push(
-          createCsvRow([
-            view.dataroomViewedAt,
-            view.dataroomDownloadedAt,
-            view.viewerName,
-            view.viewerEmail,
-            view.linkName,
-            view.verified,
-            view.agreementStatus,
-            view.agreementName,
-            view.agreementContent,
-            view.agreementAcceptedAt,
-            docView.documentName,
-            docView.viewedAt,
-            docView.downloadedAt,
-            (docView.duration / 1000).toFixed(1),
-            docView.completionRate,
-            docView.documentVersion,
-            userAgentData?.data[0]?.browser || "NaN",
-            userAgentData?.data[0]?.os || "NaN",
-            userAgentData?.data[0]?.device || "NaN",
-            userAgentData?.data[0]?.country || "NaN",
-            userAgentData?.data[0]?.city || "NaN",
-          ]),
+        // Add custom field values for this dataroom view using direct ID lookup
+        const dataroomView = dataroomViewMap.get(view.dataroomViewId);
+        rowData.push(
+          ...extractCustomFieldValues(dataroomView, uniqueCustomFields),
         );
+
+        csvRows.push(createCsvRow(rowData));
       });
     }
   });

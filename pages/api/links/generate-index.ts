@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { ItemType } from "@prisma/client";
 
 import { generateDataroomIndex } from "@/lib/dataroom/index-generator";
+import { getFeatureFlags } from "@/lib/featureFlags";
 import prisma from "@/lib/prisma";
 import { LinkWithDataroom } from "@/lib/types";
 import { IndexFileFormat } from "@/lib/types/index-file";
@@ -54,6 +55,7 @@ export default async function handle(
             updatedAt: true,
             teamId: true,
             isArchived: true,
+            deletedAt: true,
             domainId: true,
             domainSlug: true,
             groupId: true,
@@ -111,6 +113,10 @@ export default async function handle(
 
     if (link.isArchived) {
       return res.status(404).json({ error: "Link archived" });
+    }
+
+    if (link.deletedAt) {
+      return res.status(404).json({ error: "Link deleted" });
     }
 
     // Check if the link is a group link and remove the folder/documents from the dataroom if not part of the group permissions
@@ -185,6 +191,7 @@ export default async function handle(
           orderIndex: doc.orderIndex,
           updatedAt: doc.updatedAt,
           createdAt: doc.createdAt,
+          hierarchicalIndex: doc.hierarchicalIndex,
           document: {
             id: doc.document.id,
             name: doc.document.name,
@@ -197,12 +204,19 @@ export default async function handle(
               isVertical: version.isVertical,
               numPages: version.numPages,
               updatedAt: version.updatedAt,
-              fileSize: version.fileSize,
+              fileSize:
+                typeof version.fileSize === "bigint"
+                  ? Number(version.fileSize)
+                  : version.fileSize,
             })),
           },
         })),
       },
     };
+
+    const { dataroomIndex } = await getFeatureFlags({
+      teamId: link.dataroom.teamId,
+    });
 
     // Generate the index file using the appropriate generator
     const { data, filename, mimeType } = await generateDataroomIndex(
@@ -212,6 +226,7 @@ export default async function handle(
         baseUrl: link.domainId
           ? `${link.domainSlug}/${link.slug}`
           : `${process.env.NEXT_PUBLIC_MARKETING_URL}/view/${link.id}`,
+        showHierarchicalIndex: dataroomIndex,
       },
     );
 

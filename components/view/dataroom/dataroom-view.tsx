@@ -2,6 +2,7 @@ import { useRouter } from "next/router";
 
 import React, { useEffect, useRef, useState } from "react";
 
+import { PendingUploadsProvider } from "@/context/pending-uploads-context";
 import { DataroomBrand } from "@prisma/client";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -42,7 +43,17 @@ export type DEFAULT_DATAROOM_VIEW_TYPE = {
   viewerId?: string;
   conversationsEnabled?: boolean;
   enableVisitorUpload?: boolean;
+  /**
+   * When the link restricts uploads to specific folders this is the ordered
+   * allow-list. `null`/`undefined` means "no restriction — visitor may upload
+   * into whichever folder they're currently browsing".
+   */
+  uploadFolderAllowList?:
+    | { id: string; name: string; path: string }[]
+    | null;
   isTeamMember?: boolean;
+  agentsEnabled?: boolean;
+  dataroomName?: string;
 };
 
 export default function DataroomView({
@@ -59,6 +70,8 @@ export default function DataroomView({
   logoOnAccessForm,
   isEmbedded,
   preview,
+  dataroomIndexEnabled,
+  textSelectionEnabled,
 }: {
   link: LinkWithDataroom;
   userEmail: string | null | undefined;
@@ -73,6 +86,8 @@ export default function DataroomView({
   isEmbedded?: boolean;
   preview?: boolean;
   logoOnAccessForm?: boolean;
+  dataroomIndexEnabled?: boolean;
+  textSelectionEnabled?: boolean;
 }) {
   useDisablePrint();
   const {
@@ -105,6 +120,11 @@ export default function DataroomView({
 
   const [code, setCode] = useState<string | null>(null);
   const [isInvalidCode, setIsInvalidCode] = useState<boolean>(false);
+  const shouldApplyAccentToDataroomView = !!(brand as any)
+    ?.applyAccentColorToDataroomView;
+  const dataroomViewBackgroundColor = shouldApplyAccentToDataroomView
+    ? brand?.accentColor
+    : "#ffffff";
 
   const handleSubmission = async (): Promise<void> => {
     setIsLoading(true);
@@ -132,6 +152,14 @@ export default function DataroomView({
       const fetchData = await response.json();
 
       if (fetchData.type === "email-verification") {
+        analytics.capture("Email Verification Requested", {
+          linkId: link.id,
+          dataroomId: dataroom?.id,
+          dataroomName: dataroom?.name,
+          linkType: "DATAROOM_LINK",
+          viewerEmail: data.email ?? verifiedEmail ?? userEmail,
+          teamId: link.teamId,
+        });
         setVerificationRequested(true);
         setIsLoading(false);
       } else {
@@ -143,7 +171,10 @@ export default function DataroomView({
           viewerId,
           conversationsEnabled,
           enableVisitorUpload,
+          uploadFolderAllowList,
           isTeamMember,
+          agentsEnabled,
+          dataroomName,
         } = fetchData as DEFAULT_DATAROOM_VIEW_TYPE;
 
         analytics.identify(
@@ -157,6 +188,7 @@ export default function DataroomView({
           viewerEmail: viewerEmail ?? data.email ?? verifiedEmail ?? userEmail,
           isEmbedded,
           isTeamMember,
+          teamId: link.teamId,
         });
 
         // set the verification token to the cookie
@@ -177,7 +209,10 @@ export default function DataroomView({
           viewerId,
           conversationsEnabled,
           enableVisitorUpload,
+          uploadFolderAllowList,
           isTeamMember,
+          agentsEnabled,
+          dataroomName,
         });
         setSubmitted(true);
         setVerificationRequested(false);
@@ -228,6 +263,7 @@ export default function DataroomView({
         setCode={setCode}
         isInvalidCode={isInvalidCode}
         setIsInvalidCode={setIsInvalidCode}
+        brand={brand}
       />
     );
   }
@@ -243,15 +279,20 @@ export default function DataroomView({
         requireEmail={emailProtected}
         requirePassword={!!linkPassword}
         requireAgreement={enableAgreement!}
+        agreementId={link.agreement?.id}
         agreementName={link.agreement?.name}
         agreementContent={link.agreement?.content}
+        agreementContentType={link.agreement?.contentType}
+        signingProvider={link.agreement?.signingProvider}
         requireName={link.agreement?.requireName}
         isLoading={isLoading}
+        linkId={link.id}
         disableEditEmail={disableEditEmail}
         useCustomAccessForm={useCustomAccessForm}
         brand={brand}
         customFields={link.customFields}
         logoOnAccessForm={logoOnAccessForm}
+        linkWelcomeMessage={link.welcomeMessage}
       />
     );
   }
@@ -266,35 +307,48 @@ export default function DataroomView({
 
   if (submitted) {
     return (
-      <div className="bg-gray-950">
-        <DataroomViewer
-          accessControls={link.accessControls || group?.accessControls || []}
-          brand={brand!}
-          viewId={viewData.viewId}
-          isPreview={viewData.isPreview}
-          linkId={link.id}
-          dataroom={dataroom}
-          allowDownload={link.allowDownload!}
-          enableIndexFile={link.enableIndexFile}
-          folderId={folderId}
-          setFolderId={setFolderId}
-          viewerId={viewData.viewerId}
-          viewData={viewData}
-          isEmbedded={isEmbedded}
-          viewerEmail={
-            viewData.viewerEmail ??
-            data.email ??
-            verifiedEmail ??
-            userEmail ??
-            undefined
-          }
-        />
-      </div>
+      <PendingUploadsProvider
+          linkId={viewData.enableVisitorUpload ? link.id : undefined}
+          dataroomId={viewData.enableVisitorUpload ? dataroom?.id : undefined}
+        >
+        <div
+          className="flex min-h-screen flex-col bg-white"
+          style={{ backgroundColor: dataroomViewBackgroundColor ?? undefined }}
+        >
+          <DataroomViewer
+            accessControls={link.accessControls || group?.accessControls || []}
+            brand={brand!}
+            viewId={viewData.viewId}
+            isPreview={viewData.isPreview}
+            linkId={link.id}
+            dataroom={dataroom}
+            allowDownload={link.allowDownload!}
+            enableIndexFile={link.enableIndexFile}
+            folderId={folderId}
+            setFolderId={setFolderId}
+            viewerId={viewData.viewerId}
+            viewData={viewData}
+            isEmbedded={isEmbedded}
+            dataroomIndexEnabled={dataroomIndexEnabled}
+            showPoweredByBanner={link.showBanner ?? false}
+            viewerEmail={
+              viewData.viewerEmail ??
+              data.email ??
+              verifiedEmail ??
+              userEmail ??
+              undefined
+            }
+          />
+        </div>
+      </PendingUploadsProvider>
     );
   }
 
   return (
-    <div className="bg-gray-950">
+    <div
+      className="min-h-screen bg-white"
+      style={{ backgroundColor: dataroomViewBackgroundColor ?? undefined }}
+    >
       <div className="flex h-screen items-center justify-center">
         <LoadingSpinner className="h-20 w-20" />
       </div>

@@ -1,13 +1,43 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
 import { getServerSession } from "next-auth/next";
+import { z } from "zod";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
+import {
+  buildAgreementSigningExternalId,
+  getSigningAgreementCreateData,
+} from "@/lib/signing/agreements";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
+import { validateContent } from "@/lib/utils/sanitize-html";
 
 import { authOptions } from "../../../auth/[...nextauth]";
+
+// Zod schema for agreement creation
+const createAgreementSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, "Name is required")
+      .max(150, "Name must be less than 150 characters"),
+    content: z
+      .string()
+      .max(1500, "Content must be less than 1500 characters")
+      .optional(),
+    contentType: z.enum(["LINK", "TEXT", "SIGNING"]).default("SIGNING"),
+    requireName: z.boolean().default(false),
+  })
+  .superRefine((data, ctx) => {
+    if (data.contentType !== "SIGNING" && !data.content?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Content is required",
+        path: ["content"],
+      });
+    }
+  });
 
 export default async function handle(
   req: NextApiRequest,
@@ -38,7 +68,18 @@ export default async function handle(
             include: {
               _count: {
                 select: {
-                  links: true,
+                  links: {
+                    where: {
+                      deletedAt: null,
+                    },
+                  },
+                  responses: {
+                    where: {
+                      signingStatus: {
+                        in: ["SIGNED", "COMPLETED"],
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -86,19 +127,48 @@ export default async function handle(
         return res.status(401).json("Unauthorized");
       }
 
-      const { name, link, requireName } = req.body as {
-        name: string;
-        link: string;
-        requireName: boolean;
-      };
+      // Validate and parse request body
+      const parseResult = createAgreementSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: "Invalid request body",
+          details: parseResult.error.flatten().fieldErrors,
+        });
+      }
 
-      const agreement = await prisma.agreement.create({
-        data: {
-          teamId,
-          name,
-          content: link,
-          requireName,
-        },
+      const { name, content, contentType, requireName } = parseResult.data;
+
+      const sanitizedContent =
+        contentType === "SIGNING"
+          ? content?.trim()
+          : validateContent(content || "", 1500);
+
+      const agreement = await prisma.$transaction(async (tx) => {
+        const created = await tx.agreement.create({
+          data: getSigningAgreementCreateData({
+            teamId,
+            name,
+            content: sanitizedContent,
+            contentType,
+            requireName,
+          }),
+        });
+
+        if (contentType === "SIGNING") {
+          return tx.agreement.update({
+            where: {
+              id: created.id,
+            },
+            data: {
+              signingExternalId: buildAgreementSigningExternalId(
+                teamId,
+                created.id,
+              ),
+            },
+          });
+        }
+
+        return created;
       });
 
       return res.status(201).json(agreement);

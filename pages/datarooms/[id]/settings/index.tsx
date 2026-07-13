@@ -10,7 +10,7 @@ import { useDataroom } from "@/lib/swr/use-dataroom";
 
 import { DataroomHeader } from "@/components/datarooms/dataroom-header";
 import { DataroomNavigation } from "@/components/datarooms/dataroom-navigation";
-import DeleteDataroom from "@/components/datarooms/settings/delete-dataroooom";
+import DeleteDataroom from "@/components/datarooms/settings/delete-dataroom";
 import DuplicateDataroom from "@/components/datarooms/settings/duplicate-dataroom";
 import SettingsTabs from "@/components/datarooms/settings/settings-tabs";
 import AppLayout from "@/components/layouts/app";
