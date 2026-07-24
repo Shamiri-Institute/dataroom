@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
         domainSlug: true,
         isArchived: true,
         deletedAt: true,
+        expiresAt: true,
         slug: true,
         domainId: true,
         linkType: true,
@@ -209,6 +210,13 @@ export async function POST(request: NextRequest) {
     if (link.deletedAt) {
       return NextResponse.json(
         { message: "Link has been deleted." },
+        { status: 404 },
+      );
+    }
+
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+      return NextResponse.json(
+        { message: "Link has expired." },
         { status: 404 },
       );
     }
