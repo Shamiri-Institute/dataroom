@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { handleRoute } from "@/ee/features/billing/cancellation/api/automatic-unpause-route";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

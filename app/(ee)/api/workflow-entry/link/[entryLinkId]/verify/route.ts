@@ -9,10 +9,8 @@ import { validateEmail } from "@/lib/utils/validate-email";
 import { VerifyEmailRequestSchema } from "@/ee/features/workflows/lib/types";
 
 // POST /app/(ee)/api/workflow-entry/[entryLinkId]/verify - Send OTP
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { entryLinkId: string } },
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ entryLinkId: string }> }) {
+  const params = await props.params;
   try {
     const { entryLinkId } = params;
     const body = await req.json();

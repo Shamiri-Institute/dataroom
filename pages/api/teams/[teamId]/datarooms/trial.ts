@@ -11,6 +11,7 @@ import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

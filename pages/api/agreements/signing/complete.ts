@@ -12,6 +12,7 @@ import { syncAgreementResponseWithSigningDocument } from "@/lib/signing/agreemen
 // `syncAgreementResponseWithSigningDocument` schedules a background folder
 // move via `waitUntil`, which requires response streaming on Pages API.
 export const config = {
+  api: {},
   supportsResponseStreaming: true,
 };
 

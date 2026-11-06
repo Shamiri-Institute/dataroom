@@ -12,8 +12,9 @@ import { generateOTP } from "@/lib/utils/generate-otp";
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { teamId: string; id: string } },
+  props: { params: Promise<{ teamId: string; id: string }> }
 ) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

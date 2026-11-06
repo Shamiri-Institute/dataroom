@@ -15,6 +15,7 @@ import { CustomUser } from "@/lib/types";
 
 // `waitUntil` requires response streaming to be enabled on Pages API routes.
 export const config = {
+  api: {},
   supportsResponseStreaming: true,
 };
 

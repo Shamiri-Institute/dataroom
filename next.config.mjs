@@ -349,26 +349,25 @@ const nextConfig = {
       "date-fns",
       "lodash",
     ],
-    outputFileTracingIncludes: {
-      "/api/mupdf/*": ["./node_modules/mupdf/dist/*.wasm"],
-      // Jackson SAML routes need jose + openid-client for crypto
-      "/api/auth/saml/token": [
-        "./node_modules/jose/**/*",
-        "./node_modules/openid-client/**/*",
-      ],
-      "/api/auth/saml/userinfo": [
-        "./node_modules/jose/**/*",
-        "./node_modules/openid-client/**/*",
-      ],
-    },
-    missingSuspenseWithCSRBailout: false,
-    // oidc-provider uses Koa which has dynamic requires that webpack can't
-    // statically analyze. Keep them out of the bundle; they'll be loaded at
-    // runtime from node_modules.
-    // jsonpath (a dub dependency) reads its grammar file from disk at module
-    // load, which breaks when webpack bundles it into app-router routes.
-    serverComponentsExternalPackages: ["oidc-provider", "koa", "jsonpath"],
   },
+  outputFileTracingIncludes: {
+    "/api/mupdf/*": ["./node_modules/mupdf/dist/*.wasm"],
+    // Jackson SAML routes need jose + openid-client for crypto
+    "/api/auth/saml/token": [
+      "./node_modules/jose/**/*",
+      "./node_modules/openid-client/**/*",
+    ],
+    "/api/auth/saml/userinfo": [
+      "./node_modules/jose/**/*",
+      "./node_modules/openid-client/**/*",
+    ],
+  },
+  // oidc-provider uses Koa which has dynamic requires that webpack can't
+  // statically analyze. Keep them out of the bundle; they'll be loaded at
+  // runtime from node_modules.
+  // jsonpath (a dub dependency) reads its grammar file from disk at module
+  // load, which breaks when webpack bundles it into app-router routes.
+  serverExternalPackages: ["oidc-provider", "koa", "jsonpath"],
   webpack: (config, { isServer }) => {
     // oidc-provider depends on Koa which uses dynamic requires webpack can't
     // statically analyze. Mark it external on the server so Node's require()

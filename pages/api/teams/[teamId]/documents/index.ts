@@ -16,6 +16,7 @@ import { supportsAdvancedExcelMode } from "@/lib/utils/get-content-type";
 import { documentUploadSchema } from "@/lib/zod/url-validation";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

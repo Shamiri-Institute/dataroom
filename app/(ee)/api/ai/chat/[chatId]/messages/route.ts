@@ -16,10 +16,8 @@ import { CustomUser } from "@/lib/types";
  * POST /api/ai/chat/[chatId]/messages
  * Send a message and get streaming response
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { chatId: string } },
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const { chatId } = params;
     const body = await req.json();

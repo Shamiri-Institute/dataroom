@@ -88,8 +88,8 @@ Full ancestry is recorded through upstream `e0e468f7`. These later commits were 
 - `9d7db9e9`: reject views on expired links. Expired view pages now return a generic 404.
 - `fb072af9` (partial): only the removal of the unauthenticated link GET routes and their
   `useLink`/`useDomainLink` hooks. The blob storage cleanup in that commit was not taken.
-- `sharp` is overridden to `0.35.5` in `package.json` (GHSA-2464-fhr4-w9xw). Remove the override
-  once Next is upgraded to a patched version.
+- `sharp` is overridden to `0.35.5` in `package.json` (GHSA-2464-fhr4-w9xw). Keep the override
+  while `@react-email/ui`'s nested Next asks for `^0.34.5`.
 
 The next full sync must also handle `lib/trigger/convert-files.ts`, which upstream moved to the
 unpublished `ee/features/conversions/lib/trigger/convert-files`: keep the fork's copy.
@@ -119,6 +119,20 @@ Two strategies used here, in order of preference:
    (The ppreview demo pages were initially deleted too, but the pinned branding
    pages embed them in preview iframes — they were re-adopted verbatim from
    upstream with the two branding stubs above backing them.)
+
+## Next.js 15 (ahead of upstream)
+
+The fork runs Next 15.5.28 for security fixes, while upstream was still on Next 14 at its last
+public commit (2026-08-28). React stays on 18 because `@tremor/react` only supports `^18`; App
+Router routes use the React 19 bundled with Next. Upstream code merged in a sync may need:
+
+- `next-async-request-api` codemod for `params`, `searchParams`, `cookies()` and `headers()`,
+  run over `app/` and any helpers in `lib/` that those routes call.
+- `api: {}` in a Pages API `config` that only sets `supportsResponseStreaming`, or the build's
+  route type check fails.
+- `<Suspense>` around any App Router page using `useSearchParams()`; the old opt-out is gone.
+- `outputFileTracingIncludes` and `serverExternalPackages` at the top level of `next.config.mjs`,
+  not under `experimental`.
 
 ## Build requirements (self-hosted)
 

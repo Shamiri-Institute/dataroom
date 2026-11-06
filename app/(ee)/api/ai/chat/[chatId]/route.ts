@@ -12,10 +12,8 @@ import { CustomUser } from "@/lib/types";
  * GET /api/ai/chat/[chatId]
  * Get chat details with messages
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { chatId: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const { chatId } = params;
     const session = await getServerSession(authOptions);
@@ -88,10 +86,8 @@ export async function GET(
  * DELETE /api/ai/chat/[chatId]
  * Delete a chat
  */
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { chatId: string } },
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const { chatId } = params;
     const session = await getServerSession(authOptions);

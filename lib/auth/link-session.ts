@@ -182,7 +182,7 @@ export async function verifyLinkSession(
   request: NextRequest,
   linkId: string,
 ): Promise<LinkSession | null> {
-  const sessionToken = cookies().get(getLinkSessionCookieName(linkId))?.value;
+  const sessionToken = (await cookies()).get(getLinkSessionCookieName(linkId))?.value;
   const fingerprint = generateSessionFingerprint(
     collectFingerprintHeaders(request.headers),
   );
@@ -218,7 +218,7 @@ async function deleteLinkSession(
 }
 
 export async function revokeLinkSession(linkId: string): Promise<void> {
-  const sessionToken = cookies().get(getLinkSessionCookieName(linkId))?.value;
+  const sessionToken = (await cookies()).get(getLinkSessionCookieName(linkId))?.value;
   if (sessionToken) {
     const session = await redis.get(`link_session:${sessionToken}`);
     if (session) {

@@ -12,6 +12,7 @@ import { CustomUser } from "@/lib/types";
 import { sendLinkCreatedWebhook } from "@/lib/webhook/triggers/link-created";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

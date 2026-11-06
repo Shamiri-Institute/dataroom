@@ -14,6 +14,7 @@ const bodyValidation = z.object({
 });
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

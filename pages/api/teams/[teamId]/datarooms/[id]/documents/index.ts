@@ -20,6 +20,7 @@ import { log, serializeFileSize } from "@/lib/utils";
 import { sortItemsByIndexAndName } from "@/lib/utils/sort-items-by-index-name";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

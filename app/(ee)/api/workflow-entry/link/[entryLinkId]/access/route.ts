@@ -17,10 +17,8 @@ import { ratelimit } from "@/lib/redis";
 import { LOCALHOST_IP } from "@/lib/utils/geo";
 
 // POST /app/(ee)/api/workflow-entry/[entryLinkId]/access - Verify OTP and execute workflow
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { entryLinkId: string } },
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ entryLinkId: string }> }) {
+  const params = await props.params;
   try {
     const { entryLinkId } = params;
     const body = await req.json();
@@ -221,7 +219,7 @@ export async function POST(
     }
 
     // Set link session cookie (httpOnly)
-    cookies().set(`pm_ls_${executionResult.targetLinkId}`, sessionToken, {
+    (await cookies()).set(`pm_ls_${executionResult.targetLinkId}`, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -231,7 +229,7 @@ export async function POST(
 
     // Set client-readable flag cookie for auto-login detection
     const flagCookieId = `pm_link_flag_${cookieFlagId}`;
-    cookies().set(flagCookieId, "true", {
+    (await cookies()).set(flagCookieId, "true", {
       httpOnly: false, // Client-readable
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -258,7 +256,7 @@ export async function POST(
         fingerprint,
       );
 
-      cookies().set(
+      (await cookies()).set(
         `pm_drs_${executionResult.targetLinkId}`,
         dataroomSession.token,
         {
@@ -272,7 +270,7 @@ export async function POST(
 
       // Set client-readable flag cookie for dataroom
       const dataroomFlagId = `pm_drs_flag_${cookieFlagId}`;
-      cookies().set(dataroomFlagId, "true", {
+      (await cookies()).set(dataroomFlagId, "true", {
         httpOnly: false, // Client-readable
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

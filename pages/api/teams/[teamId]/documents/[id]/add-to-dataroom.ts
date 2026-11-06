@@ -15,6 +15,7 @@ import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
 };

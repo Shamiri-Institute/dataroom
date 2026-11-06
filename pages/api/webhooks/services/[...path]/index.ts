@@ -35,6 +35,7 @@ import { sendLinkCreatedWebhook } from "@/lib/webhook/triggers/link-created";
 import { webhookFileUrlSchema } from "@/lib/zod/url-validation";
 
 export const config = {
+  api: {},
   // in order to enable `waitUntil` function
   supportsResponseStreaming: true,
   maxDuration: 120,
