@@ -220,6 +220,9 @@
     },
     "tar": "7.5.22",
     "lodash": "4.18.1",
-    "sharp": "0.35.5"
+    "sharp": "0.35.5",
+    "sanitize-html": {
+      "htmlparser2": "10.1.0"
+    }
   }
 }
