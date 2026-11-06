@@ -25,7 +25,7 @@ export function useAnalytics() {
     distinctId?: string,
     properties?: Record<string, unknown>,
   ) => {
-    if (!isPostHogEnabled) {
+    if (!isPostHogEnabled || !distinctId) {
       return;
     }
 
