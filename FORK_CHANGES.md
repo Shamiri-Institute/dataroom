@@ -76,6 +76,23 @@ hardcoded `usePlan()`; new *server-side* gates in flows we use must be neutraliz
    code, so customizations can vanish without a conflict.
 4. Take upstream's `package-lock.json`, re-add fork deps to `package.json`, run `npm install`.
 5. Typecheck/build before merging to `main`.
+6. **Land sync PRs with a merge commit, never a squash.** Squashing PR #44 dropped the upstream
+   ancestry, which inflated "commits behind" from 56 to 1,466 and a merge from 19 conflicts to
+   239 until it was re-recorded.
+
+## Upstream fixes taken ahead of a full sync
+
+Full ancestry is recorded through upstream `e0e468f7`. These later commits were cherry-picked:
+
+- `6b66eb1f`: scope folder delete/rename to the caller's team.
+- `9d7db9e9`: reject views on expired links. Expired view pages now return a generic 404.
+- `fb072af9` (partial): only the removal of the unauthenticated link GET routes and their
+  `useLink`/`useDomainLink` hooks. The blob storage cleanup in that commit was not taken.
+- `sharp` is overridden to `0.35.5` in `package.json` (GHSA-2464-fhr4-w9xw). Remove the override
+  once Next is upgraded to a patched version.
+
+The next full sync must also handle `lib/trigger/convert-files.ts`, which upstream moved to the
+unpublished `ee/features/conversions/lib/trigger/convert-files`: keep the fork's copy.
 
 ## Private EE modules (discovered 2026-07 sync)
 
