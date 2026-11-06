@@ -20,8 +20,9 @@ import { CustomUser } from "@/lib/types";
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { dataroomId: string; teamId: string } },
+  props: { params: Promise<{ dataroomId: string; teamId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { dataroomId, teamId } = params;
     const session = await getServerSession(authOptions);

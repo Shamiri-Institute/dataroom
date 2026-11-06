@@ -6,10 +6,8 @@ import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 
 // GET /app/(ee)/api/workflows/[workflowId]/executions?teamId=xxx - List workflow executions
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {

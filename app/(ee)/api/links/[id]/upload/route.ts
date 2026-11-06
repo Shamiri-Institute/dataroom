@@ -16,10 +16,8 @@ import { sanitizePlainText } from "@/lib/utils/sanitize-html";
  * GET /api/links/[id]/upload?dataroomId=xxx
  * Returns the viewer's previously uploaded documents for this dataroom.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const linkId = params.id;
     const dataroomId = request.nextUrl.searchParams.get("dataroomId");
@@ -110,10 +108,8 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const linkId = params.id;
     const body = await request.json();

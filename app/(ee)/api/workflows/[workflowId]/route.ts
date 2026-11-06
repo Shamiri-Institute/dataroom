@@ -13,10 +13,8 @@ import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 
 // GET /app/(ee)/api/workflows/[workflowId]?teamId=xxx - Get single workflow with details
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -112,10 +110,8 @@ export async function GET(
 }
 
 // PATCH /app/(ee)/api/workflows/[workflowId]?teamId=xxx - Update workflow
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -222,10 +218,8 @@ export async function PATCH(
 }
 
 // DELETE /app/(ee)/api/workflows/[workflowId]?teamId=xxx - Delete workflow
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {

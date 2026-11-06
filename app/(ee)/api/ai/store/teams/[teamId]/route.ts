@@ -12,10 +12,8 @@ import { CustomUser } from "@/lib/types";
  * GET /api/ai/store/teams/[teamId]
  * Get team vector store information
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { teamId: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ teamId: string }> }) {
+  const params = await props.params;
   try {
     const { teamId } = params;
     const session = await getServerSession(authOptions);

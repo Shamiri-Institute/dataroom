@@ -11,10 +11,8 @@ import { CustomUser } from "@/lib/types";
  * GET /api/ai/store/runs/[runId]
  * Get the status of a Trigger.dev run for polling
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { runId: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ runId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
 

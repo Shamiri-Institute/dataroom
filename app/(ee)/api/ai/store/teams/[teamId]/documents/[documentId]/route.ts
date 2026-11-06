@@ -21,8 +21,9 @@ import { CustomUser } from "@/lib/types";
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { documentId: string; teamId: string } },
+  props: { params: Promise<{ documentId: string; teamId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { documentId, teamId } = params;
     const session = await getServerSession(authOptions);
@@ -205,8 +206,9 @@ export async function POST(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { documentId: string; teamId: string } },
+  props: { params: Promise<{ documentId: string; teamId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { documentId, teamId } = params;
     const session = await getServerSession(authOptions);

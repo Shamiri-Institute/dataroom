@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { handleBulkLinkImport } from "@/lib/api/links/bulk-import";
 
 export const config = {
+  api: {},
   supportsResponseStreaming: true,
   maxDuration: 120,
 };

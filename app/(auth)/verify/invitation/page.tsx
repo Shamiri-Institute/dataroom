@@ -46,13 +46,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function VerifyInvitationPage({
-  searchParams,
-}: {
-  searchParams: {
-    token?: string;
-  };
-}) {
+export default async function VerifyInvitationPage(
+  props: {
+    searchParams: Promise<{
+      token?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const { token: jwtToken } = searchParams;
 
   if (!jwtToken) {

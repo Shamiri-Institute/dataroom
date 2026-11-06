@@ -23,6 +23,7 @@ import { buildContentDisposition } from "@/lib/utils";
 
 // `waitUntil` requires response streaming to be enabled on Pages API routes.
 export const config = {
+  api: {},
   supportsResponseStreaming: true,
 };
 

@@ -16,8 +16,9 @@ import { CustomUser } from "@/lib/types";
 // PATCH /app/(ee)/api/workflows/[workflowId]/steps/[stepId]?teamId=xxx - Update step
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { workflowId: string; stepId: string } },
+  props: { params: Promise<{ workflowId: string; stepId: string }> }
 ) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -250,8 +251,9 @@ export async function PATCH(
 // DELETE /app/(ee)/api/workflows/[workflowId]/steps/[stepId]?teamId=xxx - Delete step
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { workflowId: string; stepId: string } },
+  props: { params: Promise<{ workflowId: string; stepId: string }> }
 ) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {

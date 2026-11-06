@@ -14,10 +14,8 @@ import {
 import { ReorderStepsRequest } from "@/ee/features/workflows/lib/types";
 
 // GET /app/(ee)/api/workflows/[workflowId]/steps?teamId=xxx - List all steps
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -130,10 +128,8 @@ export async function GET(
 }
 
 // POST /app/(ee)/api/workflows/[workflowId]/steps?teamId=xxx - Create a new step
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -328,10 +324,8 @@ export async function POST(
 }
 
 // PUT /app/(ee)/api/workflows/[workflowId]/steps?teamId=xxx - Reorder steps
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { workflowId: string } },
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
