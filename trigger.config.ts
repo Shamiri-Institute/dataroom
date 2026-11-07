@@ -6,6 +6,7 @@ import { defineConfig, timeout } from "@trigger.dev/sdk";
 export default defineConfig({
   project: "proj_yjzqjdmwcponnojesbcw",
   dirs: ["./lib/trigger", "./ee/**/lib/trigger"],
+  runtime: "node-24",
   maxDuration: timeout.None, // no max duration
   retries: {
     enabledInDev: false,
