@@ -1,0 +1,35 @@
+name: Deploy Trigger.dev tasks
+
+# Tasks do not deploy with Vercel. Production once ran code four months behind
+# main, so deploy them whenever main changes.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+
+concurrency:
+  group: trigger-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Check required variables
+        run: node .github/scripts/check-trigger-env.mjs
+      - name: Deploy
+        run: npm run trigger:v4:deploy
