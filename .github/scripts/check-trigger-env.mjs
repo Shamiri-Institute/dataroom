@@ -12,7 +12,6 @@ const REQUIRED = [
   "NEXT_PRIVATE_ARCHIVE_BUCKET",
   // Database: prisma/schema/schema.prisma
   "POSTGRES_PRISMA_URL",
-  "POSTGRES_PRISMA_URL_NON_POOLING",
   // Document conversion: lib/trigger/convert-files.ts
   "NEXT_PRIVATE_CONVERSION_BASE_URL",
   "NEXT_PRIVATE_INTERNAL_AUTH_TOKEN",
