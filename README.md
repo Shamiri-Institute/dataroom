@@ -97,11 +97,8 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 To prepare the Tinybird database, follow these steps:
 
-0. We use `pipenv` to manage our Python dependencies. If you don't have it installed, you can install it using the following command:
-   ```sh
-   pkgx pipenv
-   ```
-1. Download the Tinybird CLI from [here](https://www.tinybird.co/docs/cli.html) and install it on your system.
+0. We use [`uv`](https://docs.astral.sh/uv/) to manage our Python dependencies. Install it if you don't have it.
+1. Install the Tinybird CLI from the repository root with `uv sync`, then activate it with `source .venv/bin/activate`.
 2. After authenticating with the Tinybird CLI, navigate to the `lib/tinybird` directory:
    ```sh
    cd lib/tinybird
@@ -116,12 +113,8 @@ To prepare the Tinybird database, follow these steps:
 #### Updating Tinybird
 
 ```sh
-pipenv shell
-## start: pkgx-specific
-cd ..
-cd papermark
-## end: pkgx-specific
-pipenv update tinybird-cli
+uv lock --upgrade-package tinybird-cli
+uv sync
 ```
 
 ## Contributing
